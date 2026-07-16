@@ -39,6 +39,10 @@ Start with:
 - `11 Implementation Backlog.md`
 - `12 GitHub Branching and Repo Setup.md`
 
+Local development setup:
+
+- `docs/LOCAL_DEVELOPMENT.md`
+
 ## Planned architecture
 
 - Backend: Python/FastAPI
@@ -47,6 +51,26 @@ Start with:
 - WhatsApp: provider-flexible adapter, ready for Meta WhatsApp Cloud API or another provider
 - AI: platform-managed keys or company-owned keys
 - Media: object storage
+
+## Local development
+
+Copy the environment template:
+
+```bash
+cp .env.example .env
+```
+
+Start the stack:
+
+```bash
+docker compose up --build
+```
+
+Then open:
+
+```text
+http://localhost:3000
+```
 
 ## Branching
 
