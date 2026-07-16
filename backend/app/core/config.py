@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     app_name: str = "Cognos AI"
     app_version: str = "0.1.0"
     environment: str = "local"
+    platform_admin_token: str = "local-dev-platform-admin-token"
     database_url: str = Field(
         default="postgresql+psycopg://cognos:cognos@db:5432/cognos_ai"
     )

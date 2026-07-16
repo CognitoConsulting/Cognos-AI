@@ -35,3 +35,20 @@ API docs:
 http://localhost:8000/docs
 ```
 
+## Early setup APIs
+
+The first foundation APIs allow platform-admin setup of:
+
+- companies
+- company users
+- projects
+- project-user assignments
+
+During local development, these APIs require:
+
+```text
+X-Platform-Admin-Token: local-dev-platform-admin-token
+```
+
+This is a temporary foundation gate, not the final production authentication system.
+
