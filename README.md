@@ -1,0 +1,67 @@
+# Cognos AI
+
+AI-assisted construction site reporting SaaS.
+
+## Product summary
+
+Cognos AI helps small contractors and builder-developers capture daily construction site data through WhatsApp and review it through a dashboard.
+
+The MVP focuses on:
+
+- progress reporting
+- manpower reporting
+- material received and issued tracking
+- image/proof capture
+- voice and text input
+- project knowledgebase-based validation
+- dashboard analytics
+- Excel export
+- automatic daily WhatsApp summaries
+
+## Repository status
+
+This is the clean MVP repository.
+
+The previous intern-built prototype should be treated as an audit/reference source only. Old prototype code should not be copied into this repository without review.
+
+## Documentation
+
+The MVP planning pack is available in:
+
+```text
+docs/mvp-planning
+```
+
+Start with:
+
+- `01 MVP Product Brief.md`
+- `02 MVP Scope.md`
+- `11 Implementation Backlog.md`
+- `12 GitHub Branching and Repo Setup.md`
+
+## Planned architecture
+
+- Backend: Python/FastAPI
+- Database: PostgreSQL
+- Dashboard: modern web frontend
+- WhatsApp: provider-flexible adapter, ready for Meta WhatsApp Cloud API or another provider
+- AI: platform-managed keys or company-owned keys
+- Media: object storage
+
+## Branching
+
+Default branch:
+
+```text
+main
+```
+
+Feature work should happen on branches such as:
+
+```text
+feature/backend-foundation
+feature/frontend-foundation
+feature/project-knowledgebase
+feature/whatsapp-provider-adapter
+feature/ai-assistant-parser
+```
