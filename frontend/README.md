@@ -23,7 +23,7 @@ Current live dashboard foundation:
 - supports date range filtering
 - includes summary cards
 - includes project-manager analytics cards for progress by area, manpower distribution, stock highlights, and attention items
-- includes CSV export buttons that Excel can open
+- includes Excel workbook export with separate sheets for accessible reporting sections
 - adapts navigation, report sections, analytics, and export buttons to the signed-in user's role
 - lets owner/admin users create projects and review selected-project details
 - lets owner/admin users add company users and assign users to the selected project
@@ -45,6 +45,12 @@ Current project management limitations:
 Current knowledgebase management limitations:
 
 - templates can be downloaded and imported, but imported knowledgebase records are not yet editable from the dashboard
+
+Current export behavior:
+
+- the dashboard exports one `.xlsx` workbook for the selected company, project, and date range
+- workbook sheets are included only for sections the signed-in user can access
+- workbook generation currently happens in the browser
 
 ## Local development
 

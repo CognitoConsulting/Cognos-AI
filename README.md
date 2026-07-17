@@ -15,7 +15,7 @@ The MVP focuses on:
 - voice and text input
 - project knowledgebase-based validation
 - dashboard analytics
-- Excel export
+- Excel workbook export
 - automatic daily WhatsApp summaries
 
 ## Repository status
@@ -68,6 +68,7 @@ Current foundation includes:
 - first dashboard team-management UI for adding users and assigning them to projects
 - first dashboard project-management UI for creating projects and reviewing project setup
 - first dashboard project knowledgebase UI for template downloads, template imports, and upload history
+- dependency-free Excel workbook export with separate sheets for reporting data
 
 ## Planned architecture
 

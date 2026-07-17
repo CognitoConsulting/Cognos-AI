@@ -409,6 +409,12 @@ export function App() {
   const canManageTeam = currentUser ? isCompanyAdmin(currentUser.role) : false;
   const canManageProjects = currentUser ? isCompanyAdmin(currentUser.role) : false;
   const canManageKnowledgebase = currentUser ? isCompanyAdmin(currentUser.role) : false;
+  const canExportWorkbook =
+    filteredData.access.progress ||
+    filteredData.access.manpower ||
+    filteredData.access.materials ||
+    filteredData.access.stock ||
+    filteredData.access.media;
   const visibleModules = useMemo(
     () => buildVisibleModules(currentUser, reportingData),
     [currentUser, reportingData],
@@ -790,29 +796,27 @@ export function App() {
           <article className="panel">
             <h3>Export</h3>
             <p>
-              Download the currently loaded and filtered records as CSV files. Excel can open
-              these directly.
+              Download the currently loaded and filtered records as one Excel workbook with
+              separate sheets for each report section you can access.
             </p>
             <div className="button-row">
-              {filteredData.access.progress ? (
-                <button onClick={() => exportCsv("progress", filteredData.progress)}>
-                  Export progress
-                </button>
-              ) : null}
-              {filteredData.access.manpower ? (
-                <button onClick={() => exportCsv("manpower", filteredData.manpower)}>
-                  Export manpower
-                </button>
-              ) : null}
-              {filteredData.access.materials ? (
-                <button onClick={() => exportCsv("materials", filteredData.materials)}>
-                  Export materials
-                </button>
-              ) : null}
+              <button
+                type="button"
+                disabled={!canExportWorkbook}
+                onClick={() =>
+                  exportExcelWorkbook({
+                    company: selectedCompany,
+                    project: selectedProject,
+                    data: filteredData,
+                    fromDate,
+                    toDate,
+                  })
+                }
+              >
+                Export Excel workbook
+              </button>
             </div>
-            {!filteredData.access.progress &&
-            !filteredData.access.manpower &&
-            !filteredData.access.materials ? (
+            {!canExportWorkbook ? (
               <p className="muted-note">
                 No exportable reporting sections are available for this role.
               </p>
@@ -1971,28 +1975,350 @@ function formatQuantity(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(2);
 }
 
-function exportCsv(fileName: string, rows: Record<string, unknown>[]) {
-  if (rows.length === 0) {
-    return;
+type WorkbookCell = string | number | boolean | null | undefined;
+
+type WorkbookSheet = {
+  name: string;
+  rows: WorkbookCell[][];
+};
+
+function exportExcelWorkbook({
+  company,
+  project,
+  data,
+  fromDate,
+  toDate,
+}: {
+  company: Company | undefined;
+  project: Project | undefined;
+  data: ReportingData;
+  fromDate: string;
+  toDate: string;
+}) {
+  const sheets: WorkbookSheet[] = [
+    {
+      name: "Summary",
+      rows: [
+        ["Company", company?.name ?? "Not selected"],
+        ["Project", project?.name ?? "Not selected"],
+        ["Project code", project?.code ?? "-"],
+        ["Date range", formatDateRange(fromDate, toDate)],
+        ["Generated at", new Date().toLocaleString()],
+        [],
+        ["Sheet", "Rows"],
+        ["Progress", data.access.progress ? data.progress.length : "Restricted"],
+        ["Manpower", data.access.manpower ? data.manpower.length : "Restricted"],
+        ["Material movement", data.access.materials ? data.materials.length : "Restricted"],
+        ["Material stock", data.access.stock ? data.stock.length : "Restricted"],
+        ["Image/proof files", data.access.media ? data.media.length : "Restricted"],
+      ],
+    },
+  ];
+
+  if (data.access.progress) {
+    sheets.push({
+      name: "Progress",
+      rows: [
+        ["Date", "Activity", "Location", "Quantity", "Unit", "Status"],
+        ...data.progress.map((entry) => [
+          entry.work_date,
+          entry.activity_name,
+          entry.location_text ?? "",
+          parseQuantity(entry.quantity),
+          entry.unit_symbol ?? "",
+          entry.status,
+        ]),
+      ],
+    });
   }
 
-  const headers = Object.keys(rows[0]);
-  const csv = [
-    headers.join(","),
-    ...rows.map((row) => headers.map((header) => csvCell(row[header])).join(",")),
-  ].join("\n");
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  if (data.access.manpower) {
+    sheets.push({
+      name: "Manpower",
+      rows: [
+        ["Date", "Trade", "Workers", "Location", "Status"],
+        ...data.manpower.map((entry) => [
+          entry.work_date,
+          entry.trade_name,
+          entry.worker_count,
+          entry.location_text ?? "",
+          entry.status,
+        ]),
+      ],
+    });
+  }
+
+  if (data.access.materials) {
+    sheets.push({
+      name: "Material Movement",
+      rows: [
+        ["Date", "Type", "Material", "Quantity", "Unit", "Location", "Proof"],
+        ...data.materials.map((entry) => [
+          entry.transaction_date,
+          entry.transaction_type,
+          entry.material_name,
+          parseQuantity(entry.quantity),
+          entry.unit_symbol ?? "",
+          entry.location_text ?? "",
+          entry.proof_status,
+        ]),
+      ],
+    });
+  }
+
+  if (data.access.stock) {
+    sheets.push({
+      name: "Material Stock",
+      rows: [
+        ["Material", "Received", "Issued", "Balance", "Unit", "Low-stock threshold"],
+        ...data.stock.map((entry) => [
+          entry.material_name,
+          parseQuantity(entry.total_received),
+          parseQuantity(entry.total_issued),
+          parseQuantity(entry.current_balance),
+          entry.unit_symbol,
+          entry.low_stock_threshold ? parseQuantity(entry.low_stock_threshold) : "",
+        ]),
+      ],
+    });
+  }
+
+  if (data.access.media) {
+    sheets.push({
+      name: "Media Proof",
+      rows: [
+        ["Created", "Type", "File", "Caption", "Storage URL", "Status"],
+        ...data.media.map((entry) => [
+          formatDateTime(entry.created_at),
+          entry.media_type,
+          entry.file_name ?? "",
+          entry.caption ?? "",
+          entry.storage_url,
+          entry.processing_status,
+        ]),
+      ],
+    });
+  }
+
+  const workbookBytes = buildXlsxWorkbook(sheets);
+  const workbookBuffer = workbookBytes.buffer.slice(
+    workbookBytes.byteOffset,
+    workbookBytes.byteOffset + workbookBytes.byteLength,
+  ) as ArrayBuffer;
+  const blob = new Blob([workbookBuffer], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `${fileName}.csv`;
+  link.download = `${safeFileName(project?.code || project?.name || "cognos-ai-report")}.xlsx`;
   link.click();
   URL.revokeObjectURL(url);
 }
 
-function csvCell(value: unknown): string {
-  const text = value === null || value === undefined ? "" : String(value);
-  return `"${text.replace(/"/g, '""')}"`;
+function buildXlsxWorkbook(sheets: WorkbookSheet[]): Uint8Array {
+  const worksheetFiles = sheets.map((sheet, index) => ({
+    path: `xl/worksheets/sheet${index + 1}.xml`,
+    content: worksheetXml(sheet),
+  }));
+  const files = [
+    { path: "[Content_Types].xml", content: contentTypesXml(sheets.length) },
+    { path: "_rels/.rels", content: rootRelationshipsXml() },
+    { path: "xl/workbook.xml", content: workbookXml(sheets) },
+    { path: "xl/_rels/workbook.xml.rels", content: workbookRelationshipsXml(sheets.length) },
+    ...worksheetFiles,
+  ];
+  return zipFiles(files);
+}
+
+function contentTypesXml(sheetCount: number): string {
+  const sheetOverrides = Array.from({ length: sheetCount }, (_, index) => {
+    const sheetNumber = index + 1;
+    return `<Override PartName="/xl/worksheets/sheet${sheetNumber}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`;
+  }).join("");
+  return xmlDocument(
+    `<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>${sheetOverrides}</Types>`,
+  );
+}
+
+function rootRelationshipsXml(): string {
+  return xmlDocument(
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>',
+  );
+}
+
+function workbookXml(sheets: WorkbookSheet[]): string {
+  const sheetXml = sheets
+    .map(
+      (sheet, index) =>
+        `<sheet name="${xmlEscape(safeSheetName(sheet.name))}" sheetId="${index + 1}" r:id="rId${index + 1}"/>`,
+    )
+    .join("");
+  return xmlDocument(
+    `<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${sheetXml}</sheets></workbook>`,
+  );
+}
+
+function workbookRelationshipsXml(sheetCount: number): string {
+  const relationships = Array.from({ length: sheetCount }, (_, index) => {
+    const sheetNumber = index + 1;
+    return `<Relationship Id="rId${sheetNumber}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${sheetNumber}.xml"/>`;
+  }).join("");
+  return xmlDocument(
+    `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${relationships}</Relationships>`,
+  );
+}
+
+function worksheetXml(sheet: WorkbookSheet): string {
+  const rows = sheet.rows
+    .map((row, rowIndex) => {
+      const rowNumber = rowIndex + 1;
+      const cells = row
+        .map((cell, cellIndex) => cellXml(cell, `${columnName(cellIndex + 1)}${rowNumber}`))
+        .join("");
+      return `<row r="${rowNumber}">${cells}</row>`;
+    })
+    .join("");
+  return xmlDocument(
+    `<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${rows}</sheetData></worksheet>`,
+  );
+}
+
+function cellXml(cell: WorkbookCell, reference: string): string {
+  if (cell === null || cell === undefined || cell === "") {
+    return `<c r="${reference}"/>`;
+  }
+  if (typeof cell === "number" && Number.isFinite(cell)) {
+    return `<c r="${reference}"><v>${cell}</v></c>`;
+  }
+  if (typeof cell === "boolean") {
+    return `<c r="${reference}" t="b"><v>${cell ? 1 : 0}</v></c>`;
+  }
+  return `<c r="${reference}" t="inlineStr"><is><t>${xmlEscape(String(cell))}</t></is></c>`;
+}
+
+function columnName(columnNumber: number): string {
+  let name = "";
+  let remaining = columnNumber;
+  while (remaining > 0) {
+    const modulo = (remaining - 1) % 26;
+    name = String.fromCharCode(65 + modulo) + name;
+    remaining = Math.floor((remaining - modulo) / 26);
+  }
+  return name;
+}
+
+function xmlDocument(body: string): string {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>${body}`;
+}
+
+function xmlEscape(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
+function safeSheetName(name: string): string {
+  return name.replace(/[\[\]:*?/\\]/g, " ").slice(0, 31) || "Sheet";
+}
+
+function safeFileName(name: string): string {
+  return (
+    name.trim().replace(/[^a-z0-9-_]+/gi, "-").replace(/^-+|-+$/g, "").toLowerCase() ||
+    "cognos-ai-report"
+  );
+}
+
+function zipFiles(files: { path: string; content: string }[]): Uint8Array {
+  const encoder = new TextEncoder();
+  const encodedFiles = files.map((file) => ({
+    path: file.path,
+    nameBytes: encoder.encode(file.path),
+    data: encoder.encode(file.content),
+  }));
+  const localParts: Uint8Array[] = [];
+  const centralParts: Uint8Array[] = [];
+  let offset = 0;
+
+  for (const file of encodedFiles) {
+    const crc = crc32(file.data);
+    const localHeader = new Uint8Array(30);
+    const localView = new DataView(localHeader.buffer);
+    localView.setUint32(0, 0x04034b50, true);
+    localView.setUint16(4, 20, true);
+    localView.setUint16(6, 0, true);
+    localView.setUint16(8, 0, true);
+    localView.setUint16(10, 0, true);
+    localView.setUint16(12, 0, true);
+    localView.setUint32(14, crc, true);
+    localView.setUint32(18, file.data.length, true);
+    localView.setUint32(22, file.data.length, true);
+    localView.setUint16(26, file.nameBytes.length, true);
+    localView.setUint16(28, 0, true);
+    localParts.push(localHeader, file.nameBytes, file.data);
+
+    const centralHeader = new Uint8Array(46);
+    const centralView = new DataView(centralHeader.buffer);
+    centralView.setUint32(0, 0x02014b50, true);
+    centralView.setUint16(4, 20, true);
+    centralView.setUint16(6, 20, true);
+    centralView.setUint16(8, 0, true);
+    centralView.setUint16(10, 0, true);
+    centralView.setUint16(12, 0, true);
+    centralView.setUint16(14, 0, true);
+    centralView.setUint32(16, crc, true);
+    centralView.setUint32(20, file.data.length, true);
+    centralView.setUint32(24, file.data.length, true);
+    centralView.setUint16(28, file.nameBytes.length, true);
+    centralView.setUint16(30, 0, true);
+    centralView.setUint16(32, 0, true);
+    centralView.setUint16(34, 0, true);
+    centralView.setUint16(36, 0, true);
+    centralView.setUint32(38, 0, true);
+    centralView.setUint32(42, offset, true);
+    centralParts.push(centralHeader, file.nameBytes);
+
+    offset += localHeader.length + file.nameBytes.length + file.data.length;
+  }
+
+  const centralDirectorySize = centralParts.reduce((sum, part) => sum + part.length, 0);
+  const endRecord = new Uint8Array(22);
+  const endView = new DataView(endRecord.buffer);
+  endView.setUint32(0, 0x06054b50, true);
+  endView.setUint16(4, 0, true);
+  endView.setUint16(6, 0, true);
+  endView.setUint16(8, encodedFiles.length, true);
+  endView.setUint16(10, encodedFiles.length, true);
+  endView.setUint32(12, centralDirectorySize, true);
+  endView.setUint32(16, offset, true);
+  endView.setUint16(20, 0, true);
+
+  return concatenateBytes([...localParts, ...centralParts, endRecord]);
+}
+
+function concatenateBytes(parts: Uint8Array[]): Uint8Array {
+  const totalLength = parts.reduce((sum, part) => sum + part.length, 0);
+  const output = new Uint8Array(totalLength);
+  let offset = 0;
+  for (const part of parts) {
+    output.set(part, offset);
+    offset += part.length;
+  }
+  return output;
+}
+
+function crc32(data: Uint8Array): number {
+  let crc = 0xffffffff;
+  for (const byte of data) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit += 1) {
+      crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1));
+    }
+  }
+  return (crc ^ 0xffffffff) >>> 0;
 }
 
 function formatDateRange(fromDate: string, toDate: string): string {

@@ -836,7 +836,9 @@ Acceptance criteria:
 - export includes material issued sheet
 - export includes image/proof links sheet
 - export does not include summary sheets for MVP
-- first dashboard export supports CSV downloads that Excel can open
+- dashboard export creates one `.xlsx` workbook for the selected project/date range
+- workbook contains separate accessible sheets for progress, manpower, material movement, stock, and media/proof records
+- workbook generation currently happens in the browser without an external spreadsheet dependency
 
 Dependencies:
 
