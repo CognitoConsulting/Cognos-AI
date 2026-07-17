@@ -65,9 +65,9 @@ After login, the dashboard stores a signed bearer token in the browser and can l
 - material stock balances
 - media/proof files
 
-It includes company/project selection, date range filters, summary cards, project-manager analytics cards, reporting tables, and Excel workbook export.
+It includes company/project selection, date range filters, summary cards, project-manager analytics cards, reporting health indicators, reporting tables, and Excel workbook export.
 
-This is still a development dashboard. The backend enforces role-aware API access, and the frontend now adapts the visible navigation, analytics, reporting tables, and export buttons to the signed-in user's role.
+This is still a development dashboard. The backend enforces role-aware API access, and the frontend now adapts the visible navigation, analytics, reporting tables, export buttons, empty states, and restricted messages to the signed-in user's role.
 
 Owner/admin users can also use the first team-management panel to:
 
