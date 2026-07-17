@@ -47,7 +47,15 @@ Frontend dashboard:
 http://localhost:3000
 ```
 
-The dashboard currently uses the local platform-admin token and can load:
+The dashboard now starts with a local login screen.
+
+After seeding demo data, use the demo owner email printed by the seed script with this password:
+
+```text
+Demo12345!
+```
+
+After login, the dashboard stores a signed bearer token in the browser and can load:
 
 - companies
 - projects
@@ -59,7 +67,7 @@ The dashboard currently uses the local platform-admin token and can load:
 
 It includes company/project selection, date range filters, summary cards, project-manager analytics cards, reporting tables, and CSV export buttons.
 
-This is still a development dashboard. Final production login and role-aware frontend permissions are not implemented yet.
+This is still a development dashboard. The current login foundation proves the sign-in flow, but final production-grade role-aware frontend permissions are not implemented yet.
 
 ## Seed demo data
 
@@ -80,6 +88,7 @@ The seed script creates:
 - material received/issued transactions
 - material stock balances, including low/negative stock examples
 - proof/media file records
+- demo passwords for seeded users
 
 The script talks to the backend API at:
 
@@ -99,6 +108,8 @@ Then open:
 http://localhost:3000
 ```
 
+Use the printed owner email and password `Demo12345!` to sign in.
+
 PostgreSQL:
 
 ```text
@@ -107,7 +118,7 @@ localhost:5433
 
 ## Local admin API token
 
-During early development, platform-admin setup APIs use a simple local token.
+During early development, platform-admin setup APIs still support a simple local token.
 
 Header:
 
@@ -117,7 +128,15 @@ X-Platform-Admin-Token: local-dev-platform-admin-token
 
 This is not the final production login system.
 
-It exists so we can safely build company/project/user setup before full authentication is implemented.
+It exists so we can safely build company/project/user setup before full role-aware authorization is implemented.
+
+The dashboard login uses:
+
+```text
+Authorization: Bearer <signed-login-token>
+```
+
+For this foundation branch, a valid login token is temporarily accepted by existing protected dashboard APIs. The next security step is to replace that compatibility layer with proper company-scoped and role-scoped API permissions.
 
 ## Example API calls
 

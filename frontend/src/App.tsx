@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 
 const PLATFORM_ADMIN_TOKEN = "local-dev-platform-admin-token";
+const ACCESS_TOKEN_STORAGE_KEY = "cognos_ai_access_token";
 
 type Company = {
   id: string;
@@ -14,6 +15,23 @@ type Project = {
   name: string;
   code: string | null;
   status: string;
+};
+
+type AuthenticatedUser = {
+  id: string;
+  company_id: string;
+  company_name: string;
+  name: string;
+  phone: string;
+  email: string | null;
+  role: string;
+};
+
+type LoginResponse = {
+  access_token: string;
+  token_type: "bearer";
+  expires_in_seconds: number;
+  user: AuthenticatedUser;
 };
 
 type ProgressEntry = {
@@ -111,6 +129,12 @@ const emptyReportingData: ReportingData = {
 };
 
 export function App() {
+  const [accessToken, setAccessToken] = useState(
+    () => localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY) ?? "",
+  );
+  const [currentUser, setCurrentUser] = useState<AuthenticatedUser | null>(null);
+  const [loginIdentifier, setLoginIdentifier] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
   const [companies, setCompanies] = useState<Company[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedCompanyId, setSelectedCompanyId] = useState("");
@@ -122,7 +146,22 @@ export function App() {
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
-    loadCompanies()
+    if (!accessToken) {
+      setLoadingMessage("");
+      setCompanies([]);
+      setProjects([]);
+      setReportingData(emptyReportingData);
+      return;
+    }
+
+    setLoadingMessage("Loading your account...");
+    loadCurrentUser(accessToken)
+      .then((user) => {
+        setCurrentUser(user);
+        setErrorMessage("");
+        setLoadingMessage("Loading companies...");
+        return loadCompanies(accessToken);
+      })
       .then((loadedCompanies) => {
         setCompanies(loadedCompanies);
         setSelectedCompanyId(loadedCompanies[0]?.id ?? "");
@@ -132,8 +171,9 @@ export function App() {
       .catch((error: Error) => {
         setLoadingMessage("");
         setErrorMessage(error.message);
+        handleLogout();
       });
-  }, []);
+  }, [accessToken]);
 
   useEffect(() => {
     if (!selectedCompanyId) {
@@ -144,7 +184,7 @@ export function App() {
     }
 
     setLoadingMessage("Loading projects...");
-    loadProjects(selectedCompanyId)
+    loadProjects(selectedCompanyId, accessToken)
       .then((loadedProjects) => {
         setProjects(loadedProjects);
         setSelectedProjectId(loadedProjects[0]?.id ?? "");
@@ -155,7 +195,7 @@ export function App() {
         setLoadingMessage("");
         setErrorMessage(error.message);
       });
-  }, [selectedCompanyId]);
+  }, [selectedCompanyId, accessToken]);
 
   useEffect(() => {
     if (!selectedCompanyId || !selectedProjectId) {
@@ -164,7 +204,7 @@ export function App() {
     }
 
     setLoadingMessage("Loading reporting records...");
-    loadReportingData(selectedCompanyId, selectedProjectId)
+    loadReportingData(selectedCompanyId, selectedProjectId, accessToken)
       .then((data) => {
         setReportingData(data);
         setErrorMessage("");
@@ -174,7 +214,7 @@ export function App() {
         setLoadingMessage("");
         setErrorMessage(error.message);
       });
-  }, [selectedCompanyId, selectedProjectId]);
+  }, [selectedCompanyId, selectedProjectId, accessToken]);
 
   const filteredData = useMemo(
     () => filterReportingData(reportingData, fromDate, toDate),
@@ -185,6 +225,70 @@ export function App() {
   const analytics = useMemo(() => buildDashboardAnalytics(filteredData), [filteredData]);
   const selectedCompany = companies.find((company) => company.id === selectedCompanyId);
   const selectedProject = projects.find((project) => project.id === selectedProjectId);
+
+  function handleLogout() {
+    localStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY);
+    setAccessToken("");
+    setCurrentUser(null);
+  }
+
+  async function handleLogin(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setLoadingMessage("Signing in...");
+    setErrorMessage("");
+    try {
+      const response = await login(loginIdentifier, loginPassword);
+      localStorage.setItem(ACCESS_TOKEN_STORAGE_KEY, response.access_token);
+      setCurrentUser(response.user);
+      setAccessToken(response.access_token);
+      setLoginPassword("");
+      setLoadingMessage("");
+    } catch (error) {
+      setLoadingMessage("");
+      setErrorMessage(error instanceof Error ? error.message : "Login failed.");
+    }
+  }
+
+  if (!accessToken) {
+    return (
+      <main className="login-page">
+        <section className="login-card">
+          <p className="eyebrow">Cognos AI</p>
+          <h1>Sign in to the construction dashboard</h1>
+          <p>
+            Use a demo user created by the seed script, or any user that has been given a
+            password by platform admin.
+          </p>
+
+          <form className="login-form" onSubmit={handleLogin}>
+            <label>
+              Email or phone
+              <input
+                value={loginIdentifier}
+                onChange={(event) => setLoginIdentifier(event.target.value)}
+                placeholder="owner-demo@example.com"
+                required
+              />
+            </label>
+            <label>
+              Password
+              <input
+                type="password"
+                value={loginPassword}
+                onChange={(event) => setLoginPassword(event.target.value)}
+                placeholder="At least 8 characters"
+                required
+              />
+            </label>
+            <button type="submit">Sign in</button>
+          </form>
+
+          {loadingMessage ? <p className="status-message">{loadingMessage}</p> : null}
+          {errorMessage ? <p className="error-message">{errorMessage}</p> : null}
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main className="app-shell">
@@ -209,12 +313,19 @@ export function App() {
             <p className="eyebrow">Live reporting dashboard</p>
             <h2>Review saved site updates by company, project, and date.</h2>
             <p>
-              This view reads the backend reporting records created from confirmed WhatsApp
-              updates. It is still using the local platform-admin token until real login is added.
+              This view reads the backend reporting records created from confirmed WhatsApp updates.
+              You are signed in as {currentUser?.name ?? "a dashboard user"}.
             </p>
           </div>
 
           <div className="filter-stack">
+            <div className="signed-in-card">
+              <span>{currentUser?.company_name ?? "Signed in"}</span>
+              <button type="button" onClick={handleLogout}>
+                Sign out
+              </button>
+            </div>
+
             <label>
               Company
               <select
@@ -489,31 +600,57 @@ function ReportingTable({
   );
 }
 
-async function loadCompanies(): Promise<Company[]> {
-  return apiRequest<Company[]>("/api/companies");
+async function login(identifier: string, password: string): Promise<LoginResponse> {
+  const response = await fetch("/api/auth/login", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ identifier, password }),
+  });
+
+  if (!response.ok) {
+    throw new Error("Invalid email/phone or password.");
+  }
+
+  return response.json() as Promise<LoginResponse>;
 }
 
-async function loadProjects(companyId: string): Promise<Project[]> {
-  return apiRequest<Project[]>(`/api/companies/${companyId}/projects`);
+async function loadCurrentUser(accessToken: string): Promise<AuthenticatedUser> {
+  return apiRequest<AuthenticatedUser>("/api/auth/me", accessToken);
 }
 
-async function loadReportingData(companyId: string, projectId: string): Promise<ReportingData> {
+async function loadCompanies(accessToken: string): Promise<Company[]> {
+  return apiRequest<Company[]>("/api/companies", accessToken);
+}
+
+async function loadProjects(companyId: string, accessToken: string): Promise<Project[]> {
+  return apiRequest<Project[]>(`/api/companies/${companyId}/projects`, accessToken);
+}
+
+async function loadReportingData(
+  companyId: string,
+  projectId: string,
+  accessToken: string,
+): Promise<ReportingData> {
   const basePath = `/api/companies/${companyId}/projects/${projectId}/reporting`;
   const [progress, manpower, materials, stock, media] = await Promise.all([
-    apiRequest<ProgressEntry[]>(`${basePath}/progress-entries`),
-    apiRequest<ManpowerEntry[]>(`${basePath}/manpower-entries`),
-    apiRequest<MaterialTransaction[]>(`${basePath}/material-transactions`),
-    apiRequest<MaterialStockBalance[]>(`${basePath}/material-stock-balances`),
-    apiRequest<MediaFile[]>(`${basePath}/media-files`),
+    apiRequest<ProgressEntry[]>(`${basePath}/progress-entries`, accessToken),
+    apiRequest<ManpowerEntry[]>(`${basePath}/manpower-entries`, accessToken),
+    apiRequest<MaterialTransaction[]>(`${basePath}/material-transactions`, accessToken),
+    apiRequest<MaterialStockBalance[]>(`${basePath}/material-stock-balances`, accessToken),
+    apiRequest<MediaFile[]>(`${basePath}/media-files`, accessToken),
   ]);
 
   return { progress, manpower, materials, stock, media };
 }
 
-async function apiRequest<T>(path: string): Promise<T> {
+async function apiRequest<T>(path: string, accessToken?: string): Promise<T> {
   const response = await fetch(path, {
     headers: {
-      "X-Platform-Admin-Token": PLATFORM_ADMIN_TOKEN,
+      ...(accessToken
+        ? { Authorization: `Bearer ${accessToken}` }
+        : { "X-Platform-Admin-Token": PLATFORM_ADMIN_TOKEN }),
     },
   });
 

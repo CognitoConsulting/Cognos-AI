@@ -204,6 +204,29 @@ Dependencies:
 - backend foundation
 - core SaaS tables
 
+### 3.1a Dashboard login foundation
+
+Priority: P0
+
+Business reason:
+
+Users need a normal login screen before the dashboard can be tested like a real SaaS product.
+
+Acceptance criteria:
+
+- users can be created with a password hash
+- dashboard has a login screen
+- backend supports login by email or phone number
+- backend returns a signed bearer token after successful login
+- dashboard can load the signed-in user's company context
+- seed demo data prints usable demo login credentials
+- temporary admin-token compatibility is documented as a short-term bridge, not final security
+
+Dependencies:
+
+- core SaaS tables
+- user setup APIs
+
 ### 3.2 Company user management
 
 Priority: P0

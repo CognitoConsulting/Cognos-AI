@@ -62,6 +62,7 @@ Current foundation includes:
 - first live dashboard reporting views for saved progress, manpower, materials, stock, and media records
 - first project-manager analytics cards for progress by area, manpower distribution, stock highlights, and attention items
 - demo data seed script for quickly populating a realistic company/project dashboard
+- password-based login foundation with signed bearer tokens for the dashboard
 
 ## Planned architecture
 
@@ -99,6 +100,8 @@ python scripts/seed_demo_data.py
 ```
 
 This creates a demo company, project, users, reporting records, stock balances, and proof images through the backend API.
+
+The seed script also prints a demo owner email and password that can be used on the dashboard login screen.
 
 ## Branching
 
