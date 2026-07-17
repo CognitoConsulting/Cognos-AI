@@ -94,22 +94,54 @@ a {
   text-transform: uppercase;
 }
 
-.project-filter {
+.project-filter,
+.filter-stack {
   display: grid;
   gap: 8px;
   min-width: 220px;
 }
 
-.project-filter label {
+.filter-stack {
+  min-width: 360px;
+}
+
+.project-filter label,
+.filter-stack label {
   color: #475467;
   font-size: 14px;
 }
 
-.project-filter select {
+.project-filter select,
+.filter-stack select,
+.filter-stack input {
   border: 1px solid #d0d5dd;
   border-radius: 12px;
   font: inherit;
   padding: 12px;
+  width: 100%;
+}
+
+.date-row {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 1fr 1fr;
+}
+
+.status-message,
+.error-message {
+  border-radius: 14px;
+  margin: 0;
+  padding: 14px 16px;
+}
+
+.status-message {
+  background: #eff8ff;
+  color: #175cd3;
+}
+
+.error-message {
+  background: #fef3f2;
+  color: #b42318;
 }
 
 .card-grid {
@@ -166,6 +198,79 @@ a {
   color: #475467;
 }
 
+.details-list {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+}
+
+.details-list div {
+  display: grid;
+  gap: 4px;
+}
+
+.details-list dt {
+  color: #667085;
+  font-size: 13px;
+}
+
+.details-list dd {
+  font-weight: 700;
+  margin: 0;
+}
+
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+button {
+  background: #155eef;
+  border: 0;
+  border-radius: 12px;
+  color: #ffffff;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  padding: 11px 14px;
+}
+
+button:hover {
+  background: #004eeb;
+}
+
+.table-panel {
+  overflow: hidden;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+table {
+  border-collapse: collapse;
+  min-width: 720px;
+  width: 100%;
+}
+
+th,
+td {
+  border-bottom: 1px solid #eaecf0;
+  padding: 12px;
+  text-align: left;
+}
+
+th {
+  color: #475467;
+  font-size: 13px;
+  text-transform: uppercase;
+}
+
+td {
+  color: #344054;
+}
+
 .bar-track {
   background: #eaecf0;
   border-radius: 999px;
@@ -195,6 +300,10 @@ a {
   .hero {
     align-items: start;
     flex-direction: column;
+  }
+
+  .filter-stack {
+    min-width: 100%;
   }
 
   .card-grid,

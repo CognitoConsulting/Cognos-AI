@@ -668,6 +668,7 @@ Acceptance criteria:
 - card for current low-stock materials
 - card for unmatched/needs-review entries
 - card for images uploaded today
+- first live dashboard view can load saved progress, manpower, material, stock, and media records
 
 Dependencies:
 
@@ -793,6 +794,7 @@ Acceptance criteria:
 - export includes material issued sheet
 - export includes image/proof links sheet
 - export does not include summary sheets for MVP
+- first dashboard export supports CSV downloads that Excel can open
 
 Dependencies:
 

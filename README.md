@@ -59,6 +59,7 @@ Current foundation includes:
 - reporting record tables for progress, manpower, materials, stock balances, and media/proof files
 - first assistant confirmed-save workflow for WhatsApp replies like “Yes”, “OK”, or “haan”
 - project-selection follow-up when a WhatsApp user belongs to multiple active projects
+- first live dashboard reporting views for saved progress, manpower, materials, stock, and media records
 
 ## Planned architecture
 
