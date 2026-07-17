@@ -113,6 +113,20 @@ type DailySummarySendResult = {
   messages: DailySummaryMessage[];
 };
 
+type WhatsAppAuditMessage = {
+  id: string;
+  company_id: string | null;
+  user_id: string | null;
+  phone: string | null;
+  direction: "inbound" | "outbound" | string;
+  message_text: string | null;
+  provider_name: string;
+  provider_message_id: string | null;
+  provider_account_id: string | null;
+  processing_status: string;
+  received_at: string;
+};
+
 type AuthenticatedUser = {
   id: string;
   company_id: string;
@@ -229,6 +243,7 @@ const moduleDefinitions = [
   { label: "Materials", id: "materials" },
   { label: "Images", id: "images" },
   { label: "Exports", id: "exports" },
+  { label: "WhatsApp", id: "whatsapp" },
   { label: "Settings", id: "settings" },
 ] as const;
 
@@ -327,6 +342,7 @@ export function App() {
   const [dailySummarySetting, setDailySummarySetting] = useState<DailySummarySetting | null>(null);
   const [dailySummaryPreview, setDailySummaryPreview] = useState<DailySummaryPreview | null>(null);
   const [dailySummaryMessages, setDailySummaryMessages] = useState<DailySummaryMessage[]>([]);
+  const [whatsAppMessages, setWhatsAppMessages] = useState<WhatsAppAuditMessage[]>([]);
   const [dailySummaryForm, setDailySummaryForm] = useState(emptyDailySummaryForm);
   const [dailySummaryDate, setDailySummaryDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [loadingMessage, setLoadingMessage] = useState("Loading companies...");
@@ -339,6 +355,8 @@ export function App() {
   const [knowledgeErrorMessage, setKnowledgeErrorMessage] = useState("");
   const [dailySummaryMessage, setDailySummaryMessage] = useState("");
   const [dailySummaryErrorMessage, setDailySummaryErrorMessage] = useState("");
+  const [whatsAppMessage, setWhatsAppMessage] = useState("");
+  const [whatsAppErrorMessage, setWhatsAppErrorMessage] = useState("");
 
   useEffect(() => {
     if (!accessToken) {
@@ -487,6 +505,23 @@ export function App() {
       });
   }, [selectedCompanyId, selectedProjectId, currentUser, accessToken, dailySummaryDate]);
 
+  useEffect(() => {
+    if (!selectedCompanyId || !currentUser || !isCompanyAdmin(currentUser.role)) {
+      setWhatsAppMessages([]);
+      return;
+    }
+
+    loadWhatsAppMessages(selectedCompanyId, accessToken)
+      .then((messages) => {
+        setWhatsAppMessages(messages);
+        setWhatsAppErrorMessage("");
+      })
+      .catch((error: Error) => {
+        setWhatsAppMessages([]);
+        setWhatsAppErrorMessage(error.message);
+      });
+  }, [selectedCompanyId, currentUser, accessToken]);
+
   const filteredData = useMemo(
     () => filterReportingData(reportingData, fromDate, toDate),
     [reportingData, fromDate, toDate],
@@ -504,6 +539,7 @@ export function App() {
   const canManageProjects = currentUser ? isCompanyAdmin(currentUser.role) : false;
   const canManageKnowledgebase = currentUser ? isCompanyAdmin(currentUser.role) : false;
   const canManageDailySummary = currentUser ? isCompanyAdmin(currentUser.role) : false;
+  const canViewWhatsAppAudit = currentUser ? isCompanyAdmin(currentUser.role) : false;
   const canExportWorkbook =
     filteredData.access.progress ||
     filteredData.access.manpower ||
@@ -737,6 +773,24 @@ export function App() {
     }
   }
 
+  async function handleRefreshWhatsAppMessages() {
+    if (!selectedCompanyId) {
+      return;
+    }
+
+    setWhatsAppMessage("");
+    setWhatsAppErrorMessage("");
+    try {
+      const messages = await loadWhatsAppMessages(selectedCompanyId, accessToken);
+      setWhatsAppMessages(messages);
+      setWhatsAppMessage(`Loaded ${messages.length} WhatsApp message(s).`);
+    } catch (error) {
+      setWhatsAppErrorMessage(
+        error instanceof Error ? error.message : "Could not load WhatsApp messages.",
+      );
+    }
+  }
+
   if (!accessToken) {
     return (
       <main className="login-page">
@@ -931,6 +985,15 @@ export function App() {
             onSaveSettings={handleSaveDailySummarySettings}
             onRefreshPreview={handleRefreshDailySummaryPreview}
             onSendNow={handleSendDailySummaryNow}
+          />
+        ) : null}
+
+        {canViewWhatsAppAudit ? (
+          <WhatsAppAuditPanel
+            messages={whatsAppMessages}
+            whatsAppMessage={whatsAppMessage}
+            whatsAppErrorMessage={whatsAppErrorMessage}
+            onRefresh={handleRefreshWhatsAppMessages}
           />
         ) : null}
 
@@ -1686,6 +1749,68 @@ function DailySummaryManagementPanel({
   );
 }
 
+function WhatsAppAuditPanel({
+  messages,
+  whatsAppMessage,
+  whatsAppErrorMessage,
+  onRefresh,
+}: {
+  messages: WhatsAppAuditMessage[];
+  whatsAppMessage: string;
+  whatsAppErrorMessage: string;
+  onRefresh: () => void;
+}) {
+  const auditCards = buildWhatsAppAuditCards(messages);
+
+  return (
+    <section className="management-section" id="whatsapp">
+      <div className="section-heading reporting-heading">
+        <div>
+          <p className="eyebrow">WhatsApp audit</p>
+          <h3>Review inbound and outbound message logs</h3>
+          <p>
+            Use this during pilots to confirm whether WhatsApp messages were received, parsed,
+            queued, simulated, sent, or blocked because of user/provider issues.
+          </p>
+        </div>
+        <div className="button-row">
+          <button type="button" onClick={onRefresh}>
+            Refresh messages
+          </button>
+        </div>
+      </div>
+
+      {whatsAppMessage ? <p className="status-message">{whatsAppMessage}</p> : null}
+      {whatsAppErrorMessage ? <p className="error-message">{whatsAppErrorMessage}</p> : null}
+
+      <section className="card-grid" aria-label="WhatsApp audit summary">
+        {auditCards.map((card) => (
+          <article className={`summary-card ${card.tone}`} key={card.label}>
+            <p>{card.label}</p>
+            <strong>{card.value}</strong>
+            <span>{card.helper}</span>
+          </article>
+        ))}
+      </section>
+
+      <ReportingTable
+        title="WhatsApp message log"
+        emptyMessage="No WhatsApp messages have been logged for this company yet."
+        helper="Company-level audit trail for inbound webhooks and outbound assistant/system replies."
+        columns={["Received", "Direction", "Phone", "Status", "Provider", "Message"]}
+        rows={messages.map((message) => [
+          formatDateTime(message.received_at),
+          formatRole(message.direction),
+          message.phone ?? "-",
+          formatRole(message.processing_status),
+          message.provider_name,
+          truncateText(message.message_text ?? "-", 90),
+        ])}
+      />
+    </section>
+  );
+}
+
 function TeamManagementPanel({
   users,
   assignments,
@@ -2199,6 +2324,16 @@ async function loadDailySummaryMessages(
   );
 }
 
+async function loadWhatsAppMessages(
+  companyId: string,
+  accessToken: string,
+): Promise<WhatsAppAuditMessage[]> {
+  return apiRequest<WhatsAppAuditMessage[]>(
+    `/api/companies/${companyId}/whatsapp/messages`,
+    accessToken,
+  );
+}
+
 async function loadReportingData(
   companyId: string,
   projectId: string,
@@ -2394,6 +2529,42 @@ function buildReportingHealth(data: ReportingData) {
       label: "Images",
       value: data.access.media ? String(mediaCount) : "Restricted",
       tone: !data.access.media ? "normal" : mediaCount > 0 ? "normal" : "warning",
+    },
+  ];
+}
+
+function buildWhatsAppAuditCards(messages: WhatsAppAuditMessage[]): SummaryCard[] {
+  const inbound = messages.filter((message) => message.direction === "inbound").length;
+  const outbound = messages.filter((message) => message.direction === "outbound").length;
+  const unknownUsers = messages.filter(
+    (message) => message.processing_status === "unknown_user",
+  ).length;
+  const queued = messages.filter((message) => message.processing_status === "queued").length;
+
+  return [
+    {
+      label: "Total messages",
+      value: String(messages.length),
+      helper: "Inbound and outbound logs",
+      tone: "blue",
+    },
+    {
+      label: "Inbound",
+      value: String(inbound),
+      helper: "Messages received from WhatsApp",
+      tone: "green",
+    },
+    {
+      label: "Outbound",
+      value: String(outbound),
+      helper: "Assistant/system replies logged",
+      tone: "amber",
+    },
+    {
+      label: "Needs attention",
+      value: String(unknownUsers + queued),
+      helper: "Unknown users or queued provider sends",
+      tone: unknownUsers + queued > 0 ? "rose" : "green",
     },
   ];
 }
@@ -2785,6 +2956,13 @@ function safeFileName(name: string): string {
   );
 }
 
+function truncateText(value: string, maxLength: number): string {
+  if (value.length <= maxLength) {
+    return value;
+  }
+  return `${value.slice(0, maxLength - 1)}…`;
+}
+
 function zipFiles(files: { path: string; content: string }[]): Uint8Array {
   const encoder = new TextEncoder();
   const encodedFiles = files.map((file) => ({
@@ -2951,7 +3129,12 @@ function buildVisibleModules(
     if (module.id === "dashboard" || module.id === "projects" || module.id === "exports") {
       return true;
     }
-    if (module.id === "team" || module.id === "knowledgebase" || module.id === "settings") {
+    if (
+      module.id === "team" ||
+      module.id === "knowledgebase" ||
+      module.id === "whatsapp" ||
+      module.id === "settings"
+    ) {
       return isAdmin;
     }
     if (module.id === "progress") {
