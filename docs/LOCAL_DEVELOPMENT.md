@@ -344,6 +344,15 @@ curl http://localhost:8000/companies/<company_id>/whatsapp/messages \
   -H "X-Platform-Admin-Token: local-dev-platform-admin-token"
 ```
 
+Send a manual outbound test reply:
+
+```bash
+curl -X POST http://localhost:8000/companies/<company_id>/whatsapp/outbound-messages \
+  -H "Content-Type: application/json" \
+  -H "X-Platform-Admin-Token: local-dev-platform-admin-token" \
+  -d @docs/examples/whatsapp-outbound-message.json
+```
+
 Current behavior:
 
 - normalizes provider payloads
@@ -353,7 +362,9 @@ Current behavior:
 - marks messages from unknown numbers as `unknown_user`
 - creates a first assistant parser result
 - creates an assistant conversation state for confirmation, missing information, or professional redirect
-- does not yet send replies
+- logs outbound assistant replies in `whatsapp_messages`
+- simulates outbound delivery for `generic` and `test` providers
+- queues outbound messages for real providers until Meta/provider credentials are configured
 
 Send a manpower test webhook:
 
@@ -452,6 +463,7 @@ curl -X POST http://localhost:8000/webhooks/whatsapp/generic \
 ```
 
 The second message should save the pending update into the correct reporting table.
+It also logs an outbound assistant reply such as "Saved. I have recorded this update."
 
 Supported simple confirmation replies include:
 
