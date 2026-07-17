@@ -105,6 +105,78 @@ curl -X POST http://localhost:8000/companies/<company_id>/projects/<project_id>/
   -d "{\"user_id\":\"<user_id>\",\"role_on_project\":\"site_engineer\",\"can_enter_progress\":true,\"can_enter_manpower\":true,\"can_view_dashboard\":true}"
 ```
 
+Create a unit:
+
+```bash
+curl -X POST http://localhost:8000/companies/<company_id>/units \
+  -H "Content-Type: application/json" \
+  -H "X-Platform-Admin-Token: local-dev-platform-admin-token" \
+  -d "{\"name\":\"Square Meter\",\"symbol\":\"sqm\",\"unit_type\":\"area\"}"
+```
+
+Create an activity:
+
+```bash
+curl -X POST http://localhost:8000/companies/<company_id>/activities \
+  -H "Content-Type: application/json" \
+  -H "X-Platform-Admin-Token: local-dev-platform-admin-token" \
+  -d "{\"name\":\"Plastering\",\"category\":\"Finishing\",\"default_unit_id\":\"<unit_id>\"}"
+```
+
+Create an activity synonym:
+
+```bash
+curl -X POST http://localhost:8000/companies/<company_id>/activities/<activity_id>/synonyms \
+  -H "Content-Type: application/json" \
+  -H "X-Platform-Admin-Token: local-dev-platform-admin-token" \
+  -d "{\"synonym\":\"plaster complete hua\",\"language\":\"hinglish\"}"
+```
+
+Create a project area:
+
+```bash
+curl -X POST http://localhost:8000/companies/<company_id>/projects/<project_id>/locations \
+  -H "Content-Type: application/json" \
+  -H "X-Platform-Admin-Token: local-dev-platform-admin-token" \
+  -d "{\"name\":\"Tower A\",\"location_type\":\"tower\"}"
+```
+
+Create a project sub-area:
+
+```bash
+curl -X POST http://localhost:8000/companies/<company_id>/projects/<project_id>/locations \
+  -H "Content-Type: application/json" \
+  -H "X-Platform-Admin-Token: local-dev-platform-admin-token" \
+  -d "{\"name\":\"Floor 2\",\"location_type\":\"floor\",\"parent_location_id\":\"<area_id>\"}"
+```
+
+Create a BOQ/material item:
+
+```bash
+curl -X POST http://localhost:8000/companies/<company_id>/projects/<project_id>/boq-items \
+  -H "Content-Type: application/json" \
+  -H "X-Platform-Admin-Token: local-dev-platform-admin-token" \
+  -d "{\"item_code\":\"PL-001\",\"item_description\":\"Internal plastering\",\"planned_quantity\":500,\"unit_id\":\"<unit_id>\",\"material_name\":\"Cement\",\"activity_id\":\"<activity_id>\"}"
+```
+
+Create a schedule item:
+
+```bash
+curl -X POST http://localhost:8000/companies/<company_id>/projects/<project_id>/schedule-items \
+  -H "Content-Type: application/json" \
+  -H "X-Platform-Admin-Token: local-dev-platform-admin-token" \
+  -d "{\"activity_id\":\"<activity_id>\",\"activity_name\":\"Plastering\",\"planned_start_date\":\"2026-07-20\",\"planned_end_date\":\"2026-07-25\",\"area_id\":\"<area_id>\",\"sub_area_id\":\"<sub_area_id>\",\"planned_quantity\":100,\"unit_id\":\"<unit_id>\"}"
+```
+
+Create a knowledge upload tracking record:
+
+```bash
+curl -X POST http://localhost:8000/companies/<company_id>/projects/<project_id>/knowledge-uploads \
+  -H "Content-Type: application/json" \
+  -H "X-Platform-Admin-Token: local-dev-platform-admin-token" \
+  -d "{\"upload_type\":\"boq\",\"file_name\":\"boq-template.xlsx\",\"uploaded_by\":\"<user_id>\",\"status\":\"imported\"}"
+```
+
 ## Database migrations
 
 Migrations run automatically when the backend container starts.
