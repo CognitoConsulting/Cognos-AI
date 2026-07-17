@@ -491,6 +491,59 @@ The save step also checks project permissions:
 - manpower requires `can_enter_manpower`
 - material received/issued requires `can_enter_materials`
 
+## Daily WhatsApp summary examples
+
+Daily summaries are configured per project.
+The default foundation setting is enabled at 7:00 PM in the project's local timezone.
+
+Get or create daily summary settings:
+
+```bash
+curl http://localhost:8000/companies/<company_id>/projects/<project_id>/daily-summary/settings \
+  -H "X-Platform-Admin-Token: local-dev-platform-admin-token"
+```
+
+Update daily summary settings:
+
+```bash
+curl -X PUT http://localhost:8000/companies/<company_id>/projects/<project_id>/daily-summary/settings \
+  -H "Content-Type: application/json" \
+  -H "X-Platform-Admin-Token: local-dev-platform-admin-token" \
+  -d @docs/examples/daily-summary-settings.json
+```
+
+Preview a summary before sending:
+
+```bash
+curl "http://localhost:8000/companies/<company_id>/projects/<project_id>/daily-summary/preview?summary_date=2026-07-17" \
+  -H "X-Platform-Admin-Token: local-dev-platform-admin-token"
+```
+
+Send the summary now:
+
+```bash
+curl -X POST http://localhost:8000/companies/<company_id>/projects/<project_id>/daily-summary/send-now \
+  -H "Content-Type: application/json" \
+  -H "X-Platform-Admin-Token: local-dev-platform-admin-token" \
+  -d @docs/examples/daily-summary-send-now.json
+```
+
+List summary send history:
+
+```bash
+curl http://localhost:8000/companies/<company_id>/projects/<project_id>/daily-summary/messages \
+  -H "X-Platform-Admin-Token: local-dev-platform-admin-token"
+```
+
+Current foundation behavior:
+
+- builds summary text from progress, manpower, materials, proof/images, and low-stock records
+- sends to active project users with dashboard access and WhatsApp phone numbers
+- logs one `daily_summary_messages` row per recipient
+- logs the underlying outbound WhatsApp message through the provider-neutral outbound foundation
+- simulates delivery for `generic` and `test` providers
+- does not include the automatic 7:00 PM scheduler yet
+
 ## Database migrations
 
 Migrations run automatically when the backend container starts.

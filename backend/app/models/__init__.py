@@ -1,5 +1,6 @@
 from app.models.assistant import AssistantConversationState, AssistantParseResult
 from app.models.company import Company
+from app.models.daily_summary import DailySummaryMessage, DailySummarySetting
 from app.models.knowledgebase import (
     Activity,
     ActivitySynonym,
@@ -28,6 +29,8 @@ __all__ = [
     "AssistantParseResult",
     "BOQItem",
     "Company",
+    "DailySummaryMessage",
+    "DailySummarySetting",
     "ManpowerEntry",
     "MaterialStockBalance",
     "MaterialTransaction",

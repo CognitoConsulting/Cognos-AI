@@ -865,6 +865,8 @@ Acceptance criteria:
 - summary recipients are configurable
 - summary includes progress, manpower, material received, material issued, stock highlights, proof/image highlights, and unmatched entries
 - summary message and delivery status are stored
+- foundation API can preview and manually send the summary before the scheduler is added
+- default foundation recipients are active project users with dashboard access and WhatsApp phone numbers
 
 Dependencies:
 

@@ -1,0 +1,6 @@
+{
+  "enabled": true,
+  "send_time_local": "19:00:00",
+  "timezone": "Asia/Kolkata",
+  "recipient_scope": "dashboard_users"
+}
