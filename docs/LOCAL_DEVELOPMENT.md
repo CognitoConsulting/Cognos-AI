@@ -333,7 +333,46 @@ curl http://localhost:8000/companies/<company_id>/projects/<project_id>/reportin
 ```
 
 The reporting APIs are still foundation APIs.
-They are not yet connected to the assistant confirmation reply or dashboard charts.
+They are now connected to the first assistant confirmation-save workflow.
+Dashboard charts are not connected yet.
+
+## Assistant confirmation-save example
+
+For a WhatsApp user assigned to exactly one active project:
+
+1. Send a normal update:
+
+```bash
+curl -X POST http://localhost:8000/webhooks/whatsapp/generic \
+  -H "Content-Type: application/json" \
+  -d "{\"message_id\":\"progress-test-001\",\"phone\":\"+919999999999\",\"message_text\":\"Aaj Tower A Floor 2 me 50 sqm plaster complete hua\",\"provider_account_id\":\"local-test-account\"}"
+```
+
+2. Send a confirmation reply:
+
+```bash
+curl -X POST http://localhost:8000/webhooks/whatsapp/generic \
+  -H "Content-Type: application/json" \
+  -d "{\"message_id\":\"progress-confirm-001\",\"phone\":\"+919999999999\",\"message_text\":\"Yes\",\"provider_account_id\":\"local-test-account\"}"
+```
+
+The second message should save the pending update into the correct reporting table.
+
+Supported simple confirmation replies include:
+
+- `Yes`
+- `OK`
+- `haan`
+- `sahi hai`
+
+If the user belongs to multiple possible projects, the system will not guess.
+It marks the conversation as needing project selection.
+
+The save step also checks project permissions:
+
+- progress requires `can_enter_progress`
+- manpower requires `can_enter_manpower`
+- material received/issued requires `can_enter_materials`
 
 ## Database migrations
 

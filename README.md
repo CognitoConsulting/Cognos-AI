@@ -57,6 +57,7 @@ Current foundation includes:
 - first rule-based assistant parser foundation
 - assistant confirmation/missing-information conversation state foundation
 - reporting record tables for progress, manpower, materials, stock balances, and media/proof files
+- first assistant confirmed-save workflow for WhatsApp replies like “Yes”, “OK”, or “haan”
 
 ## Planned architecture
 

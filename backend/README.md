@@ -57,6 +57,7 @@ The first foundation APIs allow platform-admin setup of:
 - first assistant parser result storage
 - assistant conversation state storage for confirmation or missing-information follow-up
 - reporting record storage for progress, manpower, material transactions, stock balances, and media/proof files
+- first confirmed-save workflow from WhatsApp confirmation replies into reporting records
 
 During local development, these APIs require:
 
@@ -110,8 +111,20 @@ Current parser behavior:
 
 This is a rule-based foundation. External AI model calls will be added later.
 
-The assistant does not yet save final progress, manpower, or material records.
-The construction reporting tables now exist; the next step is to connect confirmed assistant conversations to these tables.
+The assistant can now save final progress, manpower, and material records after a simple confirmation reply such as `Yes`, `OK`, or `haan`.
+
+Current save behavior:
+
+- if the user has exactly one active assigned project, the confirmed update is saved to that project
+- if the user has multiple possible projects, the system does not guess and marks the state as needing project selection
+- project-user permissions are checked before saving
+- progress updates create one `progress_entries` record
+- manpower updates create one `manpower_entries` record per trade/category
+- material received/issued creates one `material_transactions` record
+- material received/issued also updates `material_stock_balances`
+
+Corrections such as “change quantity to 60” are not implemented yet.
+Outbound WhatsApp replies are also not sent yet; the system stores the prompt/state internally for now.
 
 ## Reporting record tables
 

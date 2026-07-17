@@ -268,12 +268,19 @@ def _detect_language(lowered: str) -> str:
 
 
 def _extract_quantity_and_unit(lowered: str) -> tuple[float | None, str | None]:
-    pattern = rf"(\d+(?:\.\d+)?)\s*({'|'.join(sorted(UNIT_TERMS, key=len, reverse=True))})\b"
+    unit_pattern = "|".join(sorted(UNIT_TERMS, key=len, reverse=True))
+    pattern = rf"(\d+(?:\.\d+)?)\s*({unit_pattern})\b"
     match = re.search(pattern, lowered)
-    if not match:
-        number = re.search(r"\b(\d+(?:\.\d+)?)\b", lowered)
-        return (float(number.group(1)), None) if number else (None, None)
-    return float(match.group(1)), match.group(2)
+    if match:
+        return float(match.group(1)), match.group(2)
+
+    separated_unit_pattern = rf"(\d+(?:\.\d+)?)(?:\s+[a-z]+){{1,3}}\s+({unit_pattern})\b"
+    separated_match = re.search(separated_unit_pattern, lowered)
+    if separated_match:
+        return float(separated_match.group(1)), separated_match.group(2)
+
+    number = re.search(r"\b(\d+(?:\.\d+)?)\b", lowered)
+    return (float(number.group(1)), None) if number else (None, None)
 
 
 def _extract_location(text: str) -> str | None:
