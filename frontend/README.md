@@ -32,6 +32,7 @@ Current live dashboard foundation:
 - lets owner/admin users download knowledgebase templates, upload completed `.xlsx` templates, and view upload history
 - lets owner/admin users configure daily WhatsApp summaries, preview the message, send manually, and view send history
 - lets owner/admin users review company-level inbound/outbound WhatsApp message logs
+- lets owner/admin users add and review WhatsApp provider accounts for local/generic and Meta-style setups
 
 During local development, run the seed script and use the printed owner email with password `Demo12345!`.
 

@@ -871,6 +871,7 @@ Acceptance criteria:
 - scheduler avoids sending the same project/date summary more than once
 - dashboard can configure summary settings, preview message text, send manually, and show send history
 - dashboard can show inbound/outbound WhatsApp message audit logs for owner/admin users
+- dashboard can create and list WhatsApp provider accounts for owner/admin users
 
 Dependencies:
 
