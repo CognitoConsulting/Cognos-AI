@@ -58,6 +58,7 @@ The first foundation APIs allow platform-admin setup of:
 - assistant conversation state storage for confirmation or missing-information follow-up
 - reporting record storage for progress, manpower, material transactions, stock balances, and media/proof files
 - first confirmed-save workflow from WhatsApp confirmation replies into reporting records
+- project-selection follow-up for users assigned to multiple active projects
 
 During local development, these APIs require:
 
@@ -116,7 +117,8 @@ The assistant can now save final progress, manpower, and material records after 
 Current save behavior:
 
 - if the user has exactly one active assigned project, the confirmed update is saved to that project
-- if the user has multiple possible projects, the system does not guess and marks the state as needing project selection
+- if the user has multiple possible projects, the system does not guess and asks for project name or project code
+- the user's next project name/code reply is matched against their active projects and then saved
 - project-user permissions are checked before saving
 - progress updates create one `progress_entries` record
 - manpower updates create one `manpower_entries` record per trade/category

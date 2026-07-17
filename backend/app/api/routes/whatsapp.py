@@ -25,6 +25,7 @@ from app.services.assistant_parser import parse_message
 from app.services.assistant_saver import (
     is_affirmative_confirmation,
     save_latest_confirmed_update,
+    save_project_selection_reply,
 )
 from app.services.assistant_workflow import build_conversation_decision
 from app.services.whatsapp_provider import normalize_inbound_message
@@ -208,22 +209,39 @@ async def receive_whatsapp_webhook(
 
     db.refresh(message)
 
-    if user and is_affirmative_confirmation(message.message_text):
-        save_result = save_latest_confirmed_update(
+    if user:
+        project_selection_result = save_project_selection_reply(
             db=db,
             user=user,
-            confirmation_message_text=message.message_text,
+            project_selection_text=message.message_text,
         )
-        if save_result.handled:
-            message.processing_status = save_result.processing_status
+        if project_selection_result.handled:
+            message.processing_status = project_selection_result.processing_status
             db.commit()
             db.refresh(message)
             return WhatsAppWebhookAccepted(
                 status="accepted",
                 message_id=message.id,
                 processing_status=message.processing_status,
-                detail=save_result.detail,
+                detail=project_selection_result.detail,
             )
+
+        if is_affirmative_confirmation(message.message_text):
+            save_result = save_latest_confirmed_update(
+                db=db,
+                user=user,
+                confirmation_message_text=message.message_text,
+            )
+            if save_result.handled:
+                message.processing_status = save_result.processing_status
+                db.commit()
+                db.refresh(message)
+                return WhatsAppWebhookAccepted(
+                    status="accepted",
+                    message_id=message.id,
+                    processing_status=message.processing_status,
+                    detail=save_result.detail,
+                )
 
     parsed = parse_message(message.message_text)
     parse_result = AssistantParseResult(
