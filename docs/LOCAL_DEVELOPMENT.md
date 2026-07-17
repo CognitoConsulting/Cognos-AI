@@ -57,7 +57,7 @@ The dashboard currently uses the local platform-admin token and can load:
 - material stock balances
 - media/proof files
 
-It includes company/project selection, date range filters, summary cards, reporting tables, and CSV export buttons.
+It includes company/project selection, date range filters, summary cards, project-manager analytics cards, reporting tables, and CSV export buttons.
 
 This is still a development dashboard. Final production login and role-aware frontend permissions are not implemented yet.
 
