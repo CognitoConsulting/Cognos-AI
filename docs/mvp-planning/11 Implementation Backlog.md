@@ -870,6 +870,7 @@ Acceptance criteria:
 - in-app scheduler checks enabled settings and sends due summaries automatically
 - scheduler avoids sending the same project/date summary more than once
 - dashboard can configure summary settings, preview message text, send manually, and show send history
+- dashboard can show inbound/outbound WhatsApp message audit logs for owner/admin users
 
 Dependencies:
 

@@ -67,6 +67,7 @@ After login, the dashboard stores a signed bearer token in the browser and can l
 
 It includes company/project selection, date range filters, summary cards, project-manager analytics cards, reporting health indicators, reporting tables, and Excel workbook export.
 Owner/admin users can also manage daily WhatsApp summary settings, preview the summary text, send it manually, and review send history from the dashboard.
+They can also review company-level inbound and outbound WhatsApp message logs for pilot debugging.
 
 This is still a development dashboard. The backend enforces role-aware API access, and the frontend now adapts the visible navigation, analytics, reporting tables, export buttons, empty states, and restricted messages to the signed-in user's role.
 
@@ -80,6 +81,7 @@ Owner/admin users can also use the first team-management panel to:
 - configure daily WhatsApp summary settings
 - preview and manually send the selected project's daily summary
 - view daily summary send history
+- review inbound/outbound WhatsApp message logs
 - view company users
 - create company users
 - view selected-project assignments

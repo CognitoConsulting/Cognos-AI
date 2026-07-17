@@ -72,6 +72,7 @@ Current foundation includes:
 - first dashboard project-management UI for creating projects and reviewing project setup
 - first dashboard project knowledgebase UI for template downloads, template imports, and upload history
 - first dashboard daily summary UI for settings, preview, manual send, and send history
+- first dashboard WhatsApp audit UI for inbound/outbound message logs and pilot debugging
 - dependency-free Excel workbook export with separate sheets for reporting data
 - polished reporting workspace with health indicators, row counts, clearer empty states, and role-aware restricted messages
 
