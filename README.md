@@ -61,6 +61,7 @@ Current foundation includes:
 - project-selection follow-up when a WhatsApp user belongs to multiple active projects
 - first live dashboard reporting views for saved progress, manpower, materials, stock, and media records
 - first project-manager analytics cards for progress by area, manpower distribution, stock highlights, and attention items
+- demo data seed script for quickly populating a realistic company/project dashboard
 
 ## Planned architecture
 
@@ -90,6 +91,14 @@ Then open:
 ```text
 http://localhost:3000
 ```
+
+Seed demo data:
+
+```bash
+python scripts/seed_demo_data.py
+```
+
+This creates a demo company, project, users, reporting records, stock balances, and proof images through the backend API.
 
 ## Branching
 

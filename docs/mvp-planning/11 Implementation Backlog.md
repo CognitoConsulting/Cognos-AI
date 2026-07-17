@@ -902,6 +902,7 @@ Acceptance criteria:
 - pilot users can be assigned
 - sample knowledgebase templates can be uploaded
 - test WhatsApp numbers can be configured
+- repeatable demo seed script creates realistic dashboard data for testing and demos
 
 Dependencies:
 

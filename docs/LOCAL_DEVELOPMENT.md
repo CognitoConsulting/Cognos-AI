@@ -61,6 +61,44 @@ It includes company/project selection, date range filters, summary cards, projec
 
 This is still a development dashboard. Final production login and role-aware frontend permissions are not implemented yet.
 
+## Seed demo data
+
+After the backend is running, create a realistic demo dataset:
+
+```bash
+python scripts/seed_demo_data.py
+```
+
+The seed script creates:
+
+- one demo company
+- one active project
+- owner, project manager, site engineer, and storekeeper users
+- project assignments with realistic permissions
+- progress entries
+- manpower entries
+- material received/issued transactions
+- material stock balances, including low/negative stock examples
+- proof/media file records
+
+The script talks to the backend API at:
+
+```text
+http://localhost:8000
+```
+
+Override the API URL if needed:
+
+```bash
+python scripts/seed_demo_data.py --api-base http://localhost:8000
+```
+
+Then open:
+
+```text
+http://localhost:3000
+```
+
 PostgreSQL:
 
 ```text
