@@ -21,6 +21,7 @@ from uuid import uuid4
 
 DEFAULT_API_BASE = "http://localhost:8000"
 DEFAULT_TOKEN = "local-dev-platform-admin-token"
+DEFAULT_DEMO_PASSWORD = "Demo12345!"
 
 
 class ApiClient:
@@ -117,6 +118,9 @@ def main() -> int:
     print(f"Material transactions: {len(material_entries)}")
     print(f"Stock balances: {len(stock_balances)}")
     print(f"Media files: {len(media_files)}")
+    print("\nDemo login:")
+    print(f"Email: {users['owner']['email']}")
+    print(f"Password: {DEFAULT_DEMO_PASSWORD}")
     print("\nOpen the dashboard:")
     print("http://localhost:3000")
     return 0
@@ -135,24 +139,28 @@ def seed_users(client: ApiClient, company_id: str, suffix: str) -> dict[str, Any
             "name": "Demo Owner",
             "phone": f"+919100{random_digits}",
             "email": f"owner-{suffix}@example.com",
+            "password": DEFAULT_DEMO_PASSWORD,
             "role": "owner",
         },
         "project_manager": {
             "name": "Demo Project Manager",
             "phone": f"+919101{random_digits}",
             "email": f"pm-{suffix}@example.com",
+            "password": DEFAULT_DEMO_PASSWORD,
             "role": "project_manager",
         },
         "site_engineer": {
             "name": "Demo Site Engineer",
             "phone": f"+919102{random_digits}",
             "email": f"engineer-{suffix}@example.com",
+            "password": DEFAULT_DEMO_PASSWORD,
             "role": "site_engineer",
         },
         "storekeeper": {
             "name": "Demo Storekeeper",
             "phone": f"+919103{random_digits}",
             "email": f"store-{suffix}@example.com",
+            "password": DEFAULT_DEMO_PASSWORD,
             "role": "storekeeper",
         },
     }

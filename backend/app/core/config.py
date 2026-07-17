@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     app_version: str = "0.1.0"
     environment: str = "local"
     platform_admin_token: str = "local-dev-platform-admin-token"
+    auth_token_secret: str = "local-dev-auth-token-secret-change-me"
+    auth_token_ttl_seconds: int = 60 * 60 * 24
     database_url: str = Field(
         default="postgresql+psycopg://cognos:cognos@db:5432/cognos_ai"
     )

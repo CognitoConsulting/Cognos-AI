@@ -17,6 +17,7 @@ The frontend will provide:
 
 Current live dashboard foundation:
 
+- requires login using a seeded demo user
 - loads companies and projects from the backend
 - shows saved progress, manpower, material, stock, and media/proof records
 - supports date range filtering
@@ -24,8 +25,9 @@ Current live dashboard foundation:
 - includes project-manager analytics cards for progress by area, manpower distribution, stock highlights, and attention items
 - includes CSV export buttons that Excel can open
 
-During local development, the frontend uses the temporary platform-admin token.
-This should be replaced by real login before production use.
+During local development, run the seed script and use the printed owner email with password `Demo12345!`.
+
+The current login uses a signed bearer token. Production-grade role-aware permissions still need to be completed before real customer use.
 
 ## Local development
 

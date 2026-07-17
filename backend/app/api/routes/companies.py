@@ -11,6 +11,7 @@ from app.schemas.company import CompanyCreate, CompanyRead
 from app.schemas.project import ProjectCreate, ProjectRead
 from app.schemas.project_user import ProjectUserCreate, ProjectUserRead
 from app.schemas.user import UserCreate, UserRead
+from app.services.auth import hash_password
 
 router = APIRouter(
     prefix="/companies",
@@ -65,7 +66,12 @@ def create_company_user(
 ) -> User:
     _require_company(db, company_id)
 
-    user = User(company_id=company_id, **payload.model_dump())
+    user_data = payload.model_dump(exclude={"password"})
+    user = User(
+        company_id=company_id,
+        password_hash=hash_password(payload.password) if payload.password else None,
+        **user_data,
+    )
     db.add(user)
 
     try:
