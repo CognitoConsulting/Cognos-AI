@@ -160,6 +160,13 @@ type AnalyticsRow = {
   tone?: "normal" | "warning" | "danger";
 };
 
+type SummaryCard = {
+  label: string;
+  value: string;
+  helper: string;
+  tone: string;
+};
+
 type DashboardAnalytics = {
   progressByLocation: AnalyticsRow[];
   manpowerByTrade: AnalyticsRow[];
@@ -404,6 +411,10 @@ export function App() {
 
   const summaryCards = useMemo(() => buildSummaryCards(filteredData), [filteredData]);
   const analytics = useMemo(() => buildDashboardAnalytics(filteredData), [filteredData]);
+  const reportingHealth = useMemo(
+    () => buildReportingHealth(filteredData),
+    [filteredData],
+  );
   const selectedCompany = companies.find((company) => company.id === selectedCompanyId);
   const selectedProject = projects.find((project) => project.id === selectedProjectId);
   const canManageTeam = currentUser ? isCompanyAdmin(currentUser.role) : false;
@@ -736,11 +747,29 @@ export function App() {
           />
         ) : null}
 
+        <section className="section-heading reporting-heading" id="dashboard">
+          <div>
+            <p className="eyebrow">Reporting workspace</p>
+            <h3>Project manager view</h3>
+            <p>
+              Focused view of confirmed field updates for the selected project and date range.
+            </p>
+          </div>
+          <div className="health-row" aria-label="Reporting health">
+            {reportingHealth.map((item) => (
+              <span className={`health-pill ${item.tone}`} key={item.label}>
+                {item.label}: {item.value}
+              </span>
+            ))}
+          </div>
+        </section>
+
         <section className="card-grid" aria-label="Summary cards">
           {summaryCards.map((card) => (
             <article className={`summary-card ${card.tone}`} key={card.label}>
               <p>{card.label}</p>
               <strong>{card.value}</strong>
+              <span>{card.helper}</span>
             </article>
           ))}
         </section>
@@ -828,6 +857,7 @@ export function App() {
           <ReportingTable
             title="Progress"
             emptyMessage="No confirmed progress entries for this selection yet."
+            helper="Confirmed progress updates from WhatsApp or reporting APIs."
             columns={["Date", "Activity", "Location", "Quantity", "Status"]}
             rows={filteredData.progress.map((entry) => [
               entry.work_date,
@@ -840,7 +870,7 @@ export function App() {
         ) : (
           <RestrictedPanel
             title="Progress"
-            message="Your project role does not include progress reporting access."
+            message="Your project role does not include progress reporting access. Ask an owner/admin if this looks wrong."
           />
         )}
 
@@ -848,6 +878,7 @@ export function App() {
           <ReportingTable
             title="Manpower"
             emptyMessage="No manpower entries for this selection yet."
+            helper="Labor counts grouped by date, trade, and location."
             columns={["Date", "Trade", "Workers", "Location", "Status"]}
             rows={filteredData.manpower.map((entry) => [
               entry.work_date,
@@ -860,7 +891,7 @@ export function App() {
         ) : (
           <RestrictedPanel
             title="Manpower"
-            message="Your project role does not include manpower reporting access."
+            message="Your project role does not include manpower reporting access. Ask an owner/admin if this looks wrong."
           />
         )}
 
@@ -868,6 +899,7 @@ export function App() {
           <ReportingTable
             title="Material movement"
             emptyMessage="No material transactions for this selection yet."
+            helper="Material received and issued records, including proof status."
             columns={["Date", "Type", "Material", "Quantity", "Location", "Proof"]}
             rows={filteredData.materials.map((entry) => [
               entry.transaction_date,
@@ -881,7 +913,7 @@ export function App() {
         ) : (
           <RestrictedPanel
             title="Material movement"
-            message="Your project role does not include material reporting access."
+            message="Your project role does not include material reporting access. Ask an owner/admin if this looks wrong."
           />
         )}
 
@@ -890,6 +922,7 @@ export function App() {
             <ReportingTable
               title="Material stock"
               emptyMessage="No stock balances yet."
+              helper="Current stock position calculated from received and issued movement."
               columns={["Material", "Received", "Issued", "Balance"]}
               rows={filteredData.stock.map((entry) => [
                 entry.material_name,
@@ -904,6 +937,7 @@ export function App() {
             <ReportingTable
               title="Image/proof files"
               emptyMessage="No media files yet."
+              helper="Image and proof records linked to project reporting activity."
               columns={["Created", "Type", "File", "Status"]}
               rows={filteredData.media.map((entry) => [
                 formatDateTime(entry.created_at),
@@ -958,19 +992,32 @@ function AnalyticsPanel({
 function ReportingTable({
   title,
   emptyMessage,
+  helper,
   columns,
   rows,
 }: {
   title: string;
   emptyMessage: string;
+  helper?: string;
   columns: string[];
   rows: string[][];
 }) {
   return (
     <article className="panel table-panel">
-      <h3>{title}</h3>
+      <div className="table-title-row">
+        <div>
+          <h3>{title}</h3>
+          {helper ? <p>{helper}</p> : null}
+        </div>
+        <span>
+          {rows.length} {rows.length === 1 ? "row" : "rows"}
+        </span>
+      </div>
       {rows.length === 0 ? (
-        <p>{emptyMessage}</p>
+        <div className="empty-state">
+          <strong>No records found</strong>
+          <p>{emptyMessage}</p>
+        </div>
       ) : (
         <div className="table-wrap">
           <table>
@@ -1822,7 +1869,7 @@ function isDateInRange(date: string, fromDate: string, toDate: string): boolean 
   return true;
 }
 
-function buildSummaryCards(data: ReportingData) {
+function buildSummaryCards(data: ReportingData): SummaryCard[] {
   const totalWorkers = data.manpower.reduce((sum, entry) => sum + entry.worker_count, 0);
   const materialReceived = data.materials.filter(
     (entry) => entry.transaction_type === "received",
@@ -1831,18 +1878,74 @@ function buildSummaryCards(data: ReportingData) {
 
   return [
     data.access.progress
-      ? { label: "Progress entries", value: String(data.progress.length), tone: "blue" }
+      ? {
+          label: "Progress entries",
+          value: String(data.progress.length),
+          helper: "Confirmed work updates",
+          tone: "blue",
+        }
       : null,
     data.access.manpower
-      ? { label: "Manpower count", value: String(totalWorkers), tone: "green" }
+      ? {
+          label: "Manpower count",
+          value: String(totalWorkers),
+          helper: "Workers across selected dates",
+          tone: "green",
+        }
       : null,
     data.access.materials
-      ? { label: "Material received", value: String(materialReceived), tone: "amber" }
+      ? {
+          label: "Material received",
+          value: String(materialReceived),
+          helper: "Received transactions",
+          tone: "amber",
+        }
       : null,
     data.access.materials
-      ? { label: "Material issued", value: String(materialIssued), tone: "rose" }
+      ? {
+          label: "Material issued",
+          value: String(materialIssued),
+          helper: "Issued transactions",
+          tone: "rose",
+        }
       : null,
-  ].filter((card): card is { label: string; value: string; tone: string } => card !== null);
+  ].filter((card): card is SummaryCard => card !== null);
+}
+
+function buildReportingHealth(data: ReportingData) {
+  const missingProof = data.materials.filter((entry) => entry.proof_status !== "attached").length;
+  const lowStock = data.stock.filter((entry) => {
+    if (!entry.low_stock_threshold) {
+      return false;
+    }
+    return parseQuantity(entry.current_balance) <= parseQuantity(entry.low_stock_threshold);
+  }).length;
+  const negativeStock = data.stock.filter((entry) => parseQuantity(entry.current_balance) < 0).length;
+  const mediaCount = data.media.length;
+
+  return [
+    {
+      label: "Proof gaps",
+      value: data.access.materials ? String(missingProof) : "Restricted",
+      tone: !data.access.materials ? "normal" : missingProof > 0 ? "warning" : "normal",
+    },
+    {
+      label: "Low stock",
+      value: data.access.stock ? String(lowStock) : "Restricted",
+      tone: !data.access.stock
+        ? "normal"
+        : negativeStock > 0
+          ? "danger"
+          : lowStock > 0
+            ? "warning"
+            : "normal",
+    },
+    {
+      label: "Images",
+      value: data.access.media ? String(mediaCount) : "Restricted",
+      tone: !data.access.media ? "normal" : mediaCount > 0 ? "normal" : "warning",
+    },
+  ];
 }
 
 function buildDashboardAnalytics(data: ReportingData): DashboardAnalytics {

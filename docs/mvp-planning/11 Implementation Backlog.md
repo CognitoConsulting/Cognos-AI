@@ -711,6 +711,8 @@ Acceptance criteria:
 - card for images uploaded today
 - first live dashboard view can load saved progress, manpower, material, stock, and media records
 - first project-manager analytics cards show progress by area, manpower distribution, material stock highlights, and attention items
+- reporting workspace shows proof gaps, low stock, and image/proof counts for the selected project/date range
+- reporting tables show helper text, row counts, clear empty states, and role-aware restricted messages
 
 Dependencies:
 

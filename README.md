@@ -69,6 +69,7 @@ Current foundation includes:
 - first dashboard project-management UI for creating projects and reviewing project setup
 - first dashboard project knowledgebase UI for template downloads, template imports, and upload history
 - dependency-free Excel workbook export with separate sheets for reporting data
+- polished reporting workspace with health indicators, row counts, clearer empty states, and role-aware restricted messages
 
 ## Planned architecture
 

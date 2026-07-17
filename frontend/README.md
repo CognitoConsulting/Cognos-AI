@@ -24,6 +24,8 @@ Current live dashboard foundation:
 - includes summary cards
 - includes project-manager analytics cards for progress by area, manpower distribution, stock highlights, and attention items
 - includes Excel workbook export with separate sheets for accessible reporting sections
+- includes reporting health indicators for proof gaps, low stock, and attached images
+- shows table helper text, row counts, clearer empty states, and role-aware restricted messages
 - adapts navigation, report sections, analytics, and export buttons to the signed-in user's role
 - lets owner/admin users create projects and review selected-project details
 - lets owner/admin users add company users and assign users to the selected project
