@@ -24,10 +24,11 @@ Current live dashboard foundation:
 - includes summary cards
 - includes project-manager analytics cards for progress by area, manpower distribution, stock highlights, and attention items
 - includes CSV export buttons that Excel can open
+- adapts navigation, report sections, analytics, and export buttons to the signed-in user's role
 
 During local development, run the seed script and use the printed owner email with password `Demo12345!`.
 
-The current login uses a signed bearer token. Backend APIs enforce role-aware access. The frontend still needs role-aware screens so users only see modules they are allowed to use.
+The current login uses a signed bearer token. Backend APIs enforce role-aware access, and the frontend now hides or marks restricted sections based on the user's role/API permissions.
 
 ## Local development
 

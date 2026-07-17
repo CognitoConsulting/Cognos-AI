@@ -64,6 +64,7 @@ Current foundation includes:
 - demo data seed script for quickly populating a realistic company/project dashboard
 - password-based login foundation with signed bearer tokens for the dashboard
 - role-aware API access for company, project, reporting, knowledgebase, and WhatsApp admin routes
+- role-aware dashboard navigation, reporting sections, and exports
 
 ## Planned architecture
 
