@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     platform_admin_token: str = "local-dev-platform-admin-token"
     auth_token_secret: str = "local-dev-auth-token-secret-change-me"
     auth_token_ttl_seconds: int = 60 * 60 * 24
+    daily_summary_scheduler_enabled: bool = True
+    daily_summary_scheduler_interval_seconds: int = 60
     database_url: str = Field(
         default="postgresql+psycopg://cognos:cognos@db:5432/cognos_ai"
     )

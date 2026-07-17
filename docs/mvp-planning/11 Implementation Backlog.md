@@ -867,6 +867,8 @@ Acceptance criteria:
 - summary message and delivery status are stored
 - foundation API can preview and manually send the summary before the scheduler is added
 - default foundation recipients are active project users with dashboard access and WhatsApp phone numbers
+- in-app scheduler checks enabled settings and sends due summaries automatically
+- scheduler avoids sending the same project/date summary more than once
 
 Dependencies:
 

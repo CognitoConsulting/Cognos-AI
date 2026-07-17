@@ -26,6 +26,8 @@ services:
       AUTH_TOKEN_SECRET: local-dev-auth-token-secret-change-me
       AUTH_TOKEN_TTL_SECONDS: 86400
       DATABASE_URL: postgresql+psycopg://cognos:cognos@db:5432/cognos_ai
+      DAILY_SUMMARY_SCHEDULER_ENABLED: "true"
+      DAILY_SUMMARY_SCHEDULER_INTERVAL_SECONDS: 60
     ports:
       - "8000:8000"
     volumes:

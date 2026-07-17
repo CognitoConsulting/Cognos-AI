@@ -126,7 +126,24 @@ Current save behavior:
 - material received/issued also updates `material_stock_balances`
 
 Corrections such as “change quantity to 60” are not implemented yet.
-Outbound WhatsApp replies are also not sent yet; the system stores the prompt/state internally for now.
+Outbound WhatsApp replies are now logged through the provider-neutral outbound foundation.
+Generic/test providers simulate delivery locally; real providers remain queued until provider credentials are configured.
+
+## Daily summary scheduler
+
+The backend now starts a lightweight in-app scheduler when `DAILY_SUMMARY_SCHEDULER_ENABLED=true`.
+
+Current behavior:
+
+- checks enabled daily summary settings at a configurable interval
+- creates default 7:00 PM local daily summary settings for active projects that do not have settings yet
+- sends each active project summary once per local project date after the configured local send time
+- sends to active project users who have dashboard access and WhatsApp phone numbers
+- records one `daily_summary_messages` row per recipient
+- logs the underlying outbound WhatsApp message through `whatsapp_messages`
+
+This is the MVP scheduler foundation.
+For larger production deployments, this can later move from the FastAPI process into a separate worker.
 
 ## Reporting record tables
 
