@@ -362,6 +362,20 @@ a {
   padding: 11px 12px;
 }
 
+.stacked-form .inline-check {
+  align-items: center;
+  background: #f8fafc;
+  border: 1px solid #eaecf0;
+  border-radius: 12px;
+  display: flex;
+  gap: 10px;
+  padding: 12px;
+}
+
+.stacked-form .inline-check input {
+  width: auto;
+}
+
 .checkbox-grid {
   display: grid;
   gap: 8px;
@@ -546,6 +560,17 @@ button:disabled {
 
 .empty-state p {
   margin: 6px 0 0;
+}
+
+.summary-preview {
+  background: #101828;
+  border-radius: 16px;
+  color: #f9fafb;
+  font: 14px/1.6 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  margin: 0;
+  overflow-x: auto;
+  padding: 18px;
+  white-space: pre-wrap;
 }
 
 .table-wrap {

@@ -30,6 +30,7 @@ Current live dashboard foundation:
 - lets owner/admin users create projects and review selected-project details
 - lets owner/admin users add company users and assign users to the selected project
 - lets owner/admin users download knowledgebase templates, upload completed `.xlsx` templates, and view upload history
+- lets owner/admin users configure daily WhatsApp summaries, preview the message, send manually, and view send history
 
 During local development, run the seed script and use the printed owner email with password `Demo12345!`.
 
