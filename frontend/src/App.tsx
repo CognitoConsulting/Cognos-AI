@@ -127,6 +127,17 @@ type WhatsAppAuditMessage = {
   received_at: string;
 };
 
+type WhatsAppProviderAccount = {
+  id: string;
+  company_id: string;
+  provider_name: string;
+  provider_account_id: string | null;
+  webhook_url: string | null;
+  phone_number_id: string | null;
+  status: string;
+  created_at: string;
+};
+
 type AuthenticatedUser = {
   id: string;
   company_id: string;
@@ -306,6 +317,14 @@ const emptyDailySummaryForm = {
   recipientScope: "dashboard_users",
 };
 
+const emptyWhatsAppProviderForm = {
+  providerName: "generic",
+  providerAccountId: "local-test-account",
+  phoneNumberId: "local-test-number",
+  webhookUrl: "",
+  status: "active",
+};
+
 function defaultAssignmentForm() {
   return {
     userId: "",
@@ -342,8 +361,10 @@ export function App() {
   const [dailySummarySetting, setDailySummarySetting] = useState<DailySummarySetting | null>(null);
   const [dailySummaryPreview, setDailySummaryPreview] = useState<DailySummaryPreview | null>(null);
   const [dailySummaryMessages, setDailySummaryMessages] = useState<DailySummaryMessage[]>([]);
+  const [whatsAppProviderAccounts, setWhatsAppProviderAccounts] = useState<WhatsAppProviderAccount[]>([]);
   const [whatsAppMessages, setWhatsAppMessages] = useState<WhatsAppAuditMessage[]>([]);
   const [dailySummaryForm, setDailySummaryForm] = useState(emptyDailySummaryForm);
+  const [whatsAppProviderForm, setWhatsAppProviderForm] = useState(emptyWhatsAppProviderForm);
   const [dailySummaryDate, setDailySummaryDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [loadingMessage, setLoadingMessage] = useState("Loading companies...");
   const [errorMessage, setErrorMessage] = useState("");
@@ -507,16 +528,19 @@ export function App() {
 
   useEffect(() => {
     if (!selectedCompanyId || !currentUser || !isCompanyAdmin(currentUser.role)) {
+      setWhatsAppProviderAccounts([]);
       setWhatsAppMessages([]);
       return;
     }
 
-    loadWhatsAppMessages(selectedCompanyId, accessToken)
-      .then((messages) => {
+    loadWhatsAppWorkspace(selectedCompanyId, accessToken)
+      .then(({ providerAccounts, messages }) => {
+        setWhatsAppProviderAccounts(providerAccounts);
         setWhatsAppMessages(messages);
         setWhatsAppErrorMessage("");
       })
       .catch((error: Error) => {
+        setWhatsAppProviderAccounts([]);
         setWhatsAppMessages([]);
         setWhatsAppErrorMessage(error.message);
       });
@@ -781,12 +805,45 @@ export function App() {
     setWhatsAppMessage("");
     setWhatsAppErrorMessage("");
     try {
-      const messages = await loadWhatsAppMessages(selectedCompanyId, accessToken);
+      const { providerAccounts, messages } = await loadWhatsAppWorkspace(
+        selectedCompanyId,
+        accessToken,
+      );
+      setWhatsAppProviderAccounts(providerAccounts);
       setWhatsAppMessages(messages);
-      setWhatsAppMessage(`Loaded ${messages.length} WhatsApp message(s).`);
+      setWhatsAppMessage(
+        `Loaded ${providerAccounts.length} provider account(s) and ${messages.length} message(s).`,
+      );
     } catch (error) {
       setWhatsAppErrorMessage(
         error instanceof Error ? error.message : "Could not load WhatsApp messages.",
+      );
+    }
+  }
+
+  async function handleCreateWhatsAppProviderAccount(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selectedCompanyId) {
+      return;
+    }
+
+    setWhatsAppMessage("");
+    setWhatsAppErrorMessage("");
+    try {
+      const providerAccount = await createWhatsAppProviderAccount(
+        selectedCompanyId,
+        accessToken,
+        whatsAppProviderForm,
+      );
+      setWhatsAppProviderAccounts((existingAccounts) => [providerAccount, ...existingAccounts]);
+      setWhatsAppProviderForm({
+        ...emptyWhatsAppProviderForm,
+        providerName: whatsAppProviderForm.providerName,
+      });
+      setWhatsAppMessage(`Created ${formatRole(providerAccount.provider_name)} provider account.`);
+    } catch (error) {
+      setWhatsAppErrorMessage(
+        error instanceof Error ? error.message : "Could not create WhatsApp provider account.",
       );
     }
   }
@@ -990,9 +1047,13 @@ export function App() {
 
         {canViewWhatsAppAudit ? (
           <WhatsAppAuditPanel
+            providerAccounts={whatsAppProviderAccounts}
+            providerForm={whatsAppProviderForm}
             messages={whatsAppMessages}
             whatsAppMessage={whatsAppMessage}
             whatsAppErrorMessage={whatsAppErrorMessage}
+            onProviderFormChange={setWhatsAppProviderForm}
+            onCreateProviderAccount={handleCreateWhatsAppProviderAccount}
             onRefresh={handleRefreshWhatsAppMessages}
           />
         ) : null}
@@ -1750,14 +1811,22 @@ function DailySummaryManagementPanel({
 }
 
 function WhatsAppAuditPanel({
+  providerAccounts,
+  providerForm,
   messages,
   whatsAppMessage,
   whatsAppErrorMessage,
+  onProviderFormChange,
+  onCreateProviderAccount,
   onRefresh,
 }: {
+  providerAccounts: WhatsAppProviderAccount[];
+  providerForm: typeof emptyWhatsAppProviderForm;
   messages: WhatsAppAuditMessage[];
   whatsAppMessage: string;
   whatsAppErrorMessage: string;
+  onProviderFormChange: (form: typeof emptyWhatsAppProviderForm) => void;
+  onCreateProviderAccount: (event: FormEvent<HTMLFormElement>) => void;
   onRefresh: () => void;
 }) {
   const auditCards = buildWhatsAppAuditCards(messages);
@@ -1782,6 +1851,94 @@ function WhatsAppAuditPanel({
 
       {whatsAppMessage ? <p className="status-message">{whatsAppMessage}</p> : null}
       {whatsAppErrorMessage ? <p className="error-message">{whatsAppErrorMessage}</p> : null}
+
+      <section className="dashboard-grid">
+        <article className="panel">
+          <h3>Add provider account</h3>
+          <p>
+            Use `generic` for local testing. When Meta WhatsApp Cloud API details are final, add a
+            `meta_cloud_api` account with the phone number ID/provider account ID.
+          </p>
+          <form className="stacked-form" onSubmit={onCreateProviderAccount}>
+            <label>
+              Provider
+              <select
+                value={providerForm.providerName}
+                onChange={(event) =>
+                  onProviderFormChange({ ...providerForm, providerName: event.target.value })
+                }
+              >
+                <option value="generic">Generic / local test</option>
+                <option value="meta_cloud_api">Meta WhatsApp Cloud API</option>
+                <option value="test">Test provider</option>
+              </select>
+            </label>
+            <label>
+              Provider account ID
+              <input
+                value={providerForm.providerAccountId}
+                onChange={(event) =>
+                  onProviderFormChange({
+                    ...providerForm,
+                    providerAccountId: event.target.value,
+                  })
+                }
+                placeholder="local-test-account"
+              />
+            </label>
+            <label>
+              Phone number ID
+              <input
+                value={providerForm.phoneNumberId}
+                onChange={(event) =>
+                  onProviderFormChange({
+                    ...providerForm,
+                    phoneNumberId: event.target.value,
+                  })
+                }
+                placeholder="Meta phone number ID or local-test-number"
+              />
+            </label>
+            <label>
+              Webhook URL
+              <input
+                value={providerForm.webhookUrl}
+                onChange={(event) =>
+                  onProviderFormChange({ ...providerForm, webhookUrl: event.target.value })
+                }
+                placeholder="https://example.com/webhooks/whatsapp/meta_cloud_api"
+              />
+            </label>
+            <label>
+              Status
+              <select
+                value={providerForm.status}
+                onChange={(event) =>
+                  onProviderFormChange({ ...providerForm, status: event.target.value })
+                }
+              >
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </label>
+            <button type="submit">Create provider account</button>
+          </form>
+        </article>
+
+        <ReportingTable
+          title="Provider accounts"
+          emptyMessage="No WhatsApp provider accounts have been configured yet."
+          helper="Provider configuration used to connect inbound webhooks and outbound message logs."
+          columns={["Provider", "Account ID", "Phone number ID", "Status", "Created"]}
+          rows={providerAccounts.map((account) => [
+            formatRole(account.provider_name),
+            account.provider_account_id ?? "-",
+            account.phone_number_id ?? "-",
+            formatRole(account.status),
+            formatDateTime(account.created_at),
+          ])}
+        />
+      </section>
 
       <section className="card-grid" aria-label="WhatsApp audit summary">
         {auditCards.map((card) => (
@@ -2331,6 +2488,51 @@ async function loadWhatsAppMessages(
   return apiRequest<WhatsAppAuditMessage[]>(
     `/api/companies/${companyId}/whatsapp/messages`,
     accessToken,
+  );
+}
+
+async function loadWhatsAppProviderAccounts(
+  companyId: string,
+  accessToken: string,
+): Promise<WhatsAppProviderAccount[]> {
+  return apiRequest<WhatsAppProviderAccount[]>(
+    `/api/companies/${companyId}/whatsapp/provider-accounts`,
+    accessToken,
+  );
+}
+
+async function loadWhatsAppWorkspace(
+  companyId: string,
+  accessToken: string,
+): Promise<{
+  providerAccounts: WhatsAppProviderAccount[];
+  messages: WhatsAppAuditMessage[];
+}> {
+  const [providerAccounts, messages] = await Promise.all([
+    loadWhatsAppProviderAccounts(companyId, accessToken),
+    loadWhatsAppMessages(companyId, accessToken),
+  ]);
+  return { providerAccounts, messages };
+}
+
+async function createWhatsAppProviderAccount(
+  companyId: string,
+  accessToken: string,
+  form: typeof emptyWhatsAppProviderForm,
+): Promise<WhatsAppProviderAccount> {
+  return apiRequest<WhatsAppProviderAccount>(
+    `/api/companies/${companyId}/whatsapp/provider-accounts`,
+    accessToken,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        provider_name: form.providerName,
+        provider_account_id: form.providerAccountId.trim() || null,
+        phone_number_id: form.phoneNumberId.trim() || null,
+        webhook_url: form.webhookUrl.trim() || null,
+        status: form.status,
+      }),
+    },
   );
 }
 
