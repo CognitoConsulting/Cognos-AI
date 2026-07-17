@@ -55,6 +55,7 @@ The first foundation APIs allow platform-admin setup of:
 - provider-neutral WhatsApp webhook intake
 - inbound WhatsApp message audit storage
 - first assistant parser result storage
+- assistant conversation state storage for confirmation or missing-information follow-up
 
 During local development, these APIs require:
 
@@ -90,6 +91,11 @@ This does not yet send WhatsApp replies or run the AI assistant workflow.
 It normalizes inbound provider payloads and stores them in `whatsapp_messages`.
 
 The webhook also creates a first parser result in `assistant_parse_results`.
+It now creates a conversation state in `assistant_conversation_states` so the next step is visible:
+
+- `awaiting_confirmation` when the message looks complete and should be confirmed before saving
+- `awaiting_missing_information` when the assistant needs more details
+- `redirected` when the message is irrelevant or offensive and should be handled professionally
 
 Current parser behavior:
 
@@ -102,6 +108,9 @@ Current parser behavior:
 - marks missing information for follow-up
 
 This is a rule-based foundation. External AI model calls will be added later.
+
+The assistant does not yet save final progress, manpower, or material records.
+That will be added after the construction reporting tables exist.
 
 Important user-identification rule:
 

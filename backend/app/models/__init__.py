@@ -1,4 +1,4 @@
-from app.models.assistant import AssistantParseResult
+from app.models.assistant import AssistantConversationState, AssistantParseResult
 from app.models.company import Company
 from app.models.knowledgebase import (
     Activity,
@@ -17,6 +17,7 @@ from app.models.whatsapp import WhatsAppMessage, WhatsAppProviderAccount
 __all__ = [
     "Activity",
     "ActivitySynonym",
+    "AssistantConversationState",
     "AssistantParseResult",
     "BOQItem",
     "Company",

@@ -55,6 +55,7 @@ Current foundation includes:
 - project knowledgebase Excel template download and import foundation
 - provider-neutral WhatsApp webhook intake and message audit storage
 - first rule-based assistant parser foundation
+- assistant confirmation/missing-information conversation state foundation
 
 ## Planned architecture
 
@@ -101,4 +102,5 @@ feature/frontend-foundation
 feature/project-knowledgebase
 feature/whatsapp-provider-adapter
 feature/ai-assistant-parser
+feature/assistant-confirmation-workflow
 ```
