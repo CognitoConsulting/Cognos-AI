@@ -43,6 +43,12 @@ The first foundation APIs allow platform-admin setup of:
 - company users
 - projects
 - project-user assignments
+- project knowledgebase units
+- project knowledgebase activities
+- project areas and sub-areas
+- BOQ/material items
+- project schedule items
+- project knowledge upload tracking
 
 During local development, these APIs require:
 

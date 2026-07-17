@@ -156,6 +156,7 @@ Acceptance criteria:
 - BOQ/material list table exists
 - schedule activity table exists
 - optional scope of work and resource plan tables are supported
+- foundation APIs exist for manually creating units, activities, locations, BOQ items, schedule items, and knowledge upload records
 
 Dependencies:
 
