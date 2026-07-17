@@ -344,6 +344,10 @@ Acceptance criteria:
 - upload history is visible
 - knowledgebase is linked to the correct project
 - foundation API can import `.xlsx` templates for units, activities, locations, BOQ, and schedule
+- dashboard can download `.xlsx` templates for units, activities, locations, BOQ, and schedule
+- dashboard can upload completed `.xlsx` templates for the selected project
+- dashboard can show selected-project knowledgebase upload history
+- dashboard editing of imported knowledgebase records is still future work
 
 Dependencies:
 

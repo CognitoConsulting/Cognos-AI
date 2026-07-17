@@ -73,12 +73,15 @@ Owner/admin users can also use the first team-management panel to:
 
 - create projects
 - view selected-project setup details
+- download project knowledgebase templates
+- upload completed project knowledgebase templates
+- view selected-project knowledgebase upload history
 - view company users
 - create company users
 - view selected-project assignments
 - assign users to the selected project with progress, manpower, material, and dashboard permissions
 
-Editing projects, archiving projects, editing users, deactivating users, and removing project assignments are not implemented yet.
+Editing imported knowledgebase records, editing projects, archiving projects, editing users, deactivating users, and removing project assignments are not implemented yet.
 
 ## Seed demo data
 

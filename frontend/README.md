@@ -27,6 +27,7 @@ Current live dashboard foundation:
 - adapts navigation, report sections, analytics, and export buttons to the signed-in user's role
 - lets owner/admin users create projects and review selected-project details
 - lets owner/admin users add company users and assign users to the selected project
+- lets owner/admin users download knowledgebase templates, upload completed `.xlsx` templates, and view upload history
 
 During local development, run the seed script and use the printed owner email with password `Demo12345!`.
 
@@ -40,6 +41,10 @@ Current team management limitations:
 Current project management limitations:
 
 - projects can be created, but not edited, archived, or deleted from the dashboard yet
+
+Current knowledgebase management limitations:
+
+- templates can be downloaded and imported, but imported knowledgebase records are not yet editable from the dashboard
 
 ## Local development
 
