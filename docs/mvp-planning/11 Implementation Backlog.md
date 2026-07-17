@@ -350,6 +350,7 @@ Acceptance criteria:
 - provider name is stored
 - provider message ID is stored
 - raw provider metadata can be stored for troubleshooting
+- inbound generic/test and Meta-style text message payloads can be received and stored
 
 Dependencies:
 

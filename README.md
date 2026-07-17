@@ -53,6 +53,7 @@ Current foundation includes:
 - project-user assignment APIs
 - project knowledgebase APIs for units, activities, locations, BOQ items, schedule items, and upload tracking
 - project knowledgebase Excel template download and import foundation
+- provider-neutral WhatsApp webhook intake and message audit storage
 
 ## Planned architecture
 

@@ -211,6 +211,52 @@ Import behavior:
 - records failed uploads with readable errors
 - stores upload history in `project_knowledge_uploads`
 
+## WhatsApp provider adapter examples
+
+Create a WhatsApp provider account:
+
+```bash
+curl -X POST http://localhost:8000/companies/<company_id>/whatsapp/provider-accounts \
+  -H "Content-Type: application/json" \
+  -H "X-Platform-Admin-Token: local-dev-platform-admin-token" \
+  -d "{\"provider_name\":\"generic\",\"provider_account_id\":\"local-test-account\",\"phone_number_id\":\"local-test-number\"}"
+```
+
+Send a generic test webhook:
+
+```bash
+curl -X POST http://localhost:8000/webhooks/whatsapp/generic \
+  -H "Content-Type: application/json" \
+  -d @docs/examples/whatsapp-generic-message.json
+```
+
+If you run the same webhook test repeatedly, change the `message_id` in the sample file.
+
+The system treats repeated provider message IDs as duplicates, which is intentional.
+
+Send a Meta-style test webhook:
+
+```bash
+curl -X POST http://localhost:8000/webhooks/whatsapp/meta_cloud_api \
+  -H "Content-Type: application/json" \
+  -d @docs/examples/whatsapp-meta-text-message.json
+```
+
+List stored WhatsApp messages:
+
+```bash
+curl http://localhost:8000/companies/<company_id>/whatsapp/messages \
+  -H "X-Platform-Admin-Token: local-dev-platform-admin-token"
+```
+
+Current behavior:
+
+- normalizes provider payloads
+- identifies active users by phone number if already created
+- stores inbound messages for audit
+- marks messages from unknown numbers as `unknown_user`
+- does not yet run the AI assistant or send replies
+
 ## Database migrations
 
 Migrations run automatically when the backend container starts.

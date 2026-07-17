@@ -11,6 +11,7 @@ from app.models.knowledgebase import (
 from app.models.project import Project
 from app.models.project_user import ProjectUser
 from app.models.user import User
+from app.models.whatsapp import WhatsAppMessage, WhatsAppProviderAccount
 
 __all__ = [
     "Activity",
@@ -24,4 +25,6 @@ __all__ = [
     "ProjectUser",
     "Unit",
     "User",
+    "WhatsAppMessage",
+    "WhatsAppProviderAccount",
 ]
