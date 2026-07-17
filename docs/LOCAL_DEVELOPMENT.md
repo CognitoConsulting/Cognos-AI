@@ -253,9 +253,34 @@ Current behavior:
 
 - normalizes provider payloads
 - identifies active users by phone number if already created
+- requires WhatsApp phone numbers to be unique across the platform
 - stores inbound messages for audit
 - marks messages from unknown numbers as `unknown_user`
-- does not yet run the AI assistant or send replies
+- creates a first assistant parser result
+- does not yet send replies
+
+Send a manpower test webhook:
+
+```bash
+curl -X POST http://localhost:8000/webhooks/whatsapp/generic \
+  -H "Content-Type: application/json" \
+  -d @docs/examples/whatsapp-manpower.json
+```
+
+Send a material received test webhook:
+
+```bash
+curl -X POST http://localhost:8000/webhooks/whatsapp/generic \
+  -H "Content-Type: application/json" \
+  -d @docs/examples/whatsapp-material-received.json
+```
+
+List assistant parse results:
+
+```bash
+curl http://localhost:8000/companies/<company_id>/assistant/parse-results \
+  -H "X-Platform-Admin-Token: local-dev-platform-admin-token"
+```
 
 ## Database migrations
 

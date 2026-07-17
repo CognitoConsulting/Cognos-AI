@@ -6,7 +6,14 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_database_session, require_platform_admin
-from app.models import Company, User, WhatsAppMessage, WhatsAppProviderAccount
+from app.models import (
+    AssistantParseResult,
+    Company,
+    User,
+    WhatsAppMessage,
+    WhatsAppProviderAccount,
+)
+from app.schemas.assistant import AssistantParseResultRead
 from app.schemas.whatsapp import (
     WhatsAppMessageRead,
     WhatsAppProviderAccountCreate,
@@ -14,6 +21,7 @@ from app.schemas.whatsapp import (
     WhatsAppWebhookAccepted,
 )
 from app.services.whatsapp_provider import normalize_inbound_message
+from app.services.assistant_parser import parse_message
 
 router = APIRouter()
 
@@ -78,6 +86,25 @@ def list_whatsapp_messages(
             select(WhatsAppMessage)
             .where(WhatsAppMessage.company_id == company_id)
             .order_by(WhatsAppMessage.received_at.desc())
+        ).all()
+    )
+
+
+@router.get(
+    "/companies/{company_id}/assistant/parse-results",
+    response_model=list[AssistantParseResultRead],
+    dependencies=[Depends(require_platform_admin)],
+)
+def list_assistant_parse_results(
+    company_id: UUID,
+    db: Session = Depends(get_database_session),
+) -> list[AssistantParseResult]:
+    _require_company(db, company_id)
+    return list(
+        db.scalars(
+            select(AssistantParseResult)
+            .where(AssistantParseResult.company_id == company_id)
+            .order_by(AssistantParseResult.created_at.desc())
         ).all()
     )
 
@@ -155,11 +182,32 @@ async def receive_whatsapp_webhook(
         raise
 
     db.refresh(message)
+    parsed = parse_message(message.message_text)
+    parse_result = AssistantParseResult(
+        company_id=message.company_id,
+        user_id=message.user_id,
+        whatsapp_message_id=message.id,
+        intent=parsed.intent,
+        confidence=parsed.confidence,
+        input_language=parsed.input_language,
+        extracted_data=parsed.extracted_data,
+        missing_fields=parsed.missing_fields,
+        validation_status=parsed.validation_status,
+        assistant_summary=parsed.assistant_summary,
+        next_action=parsed.next_action,
+    )
+    db.add(parse_result)
+    message.processing_status = (
+        "parsed" if message.processing_status == "received" else message.processing_status
+    )
+    db.commit()
+    db.refresh(message)
+
     return WhatsAppWebhookAccepted(
         status="accepted",
         message_id=message.id,
         processing_status=message.processing_status,
-        detail="Inbound WhatsApp message normalized and stored.",
+        detail="Inbound WhatsApp message normalized, stored, and parsed.",
     )
 
 
