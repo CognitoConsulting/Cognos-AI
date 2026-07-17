@@ -17,6 +17,29 @@ type Project = {
   status: string;
 };
 
+type CompanyUser = {
+  id: string;
+  company_id: string;
+  name: string;
+  phone: string;
+  email: string | null;
+  role: string;
+  is_active: boolean;
+  created_at: string;
+};
+
+type ProjectAssignment = {
+  id: string;
+  project_id: string;
+  user_id: string;
+  role_on_project: string;
+  can_enter_progress: boolean;
+  can_enter_manpower: boolean;
+  can_enter_materials: boolean;
+  can_view_dashboard: boolean;
+  created_at: string;
+};
+
 type AuthenticatedUser = {
   id: string;
   company_id: string;
@@ -137,6 +160,15 @@ const noReportingAccess: ReportingAccess = {
   media: false,
 };
 
+const roleOptions = [
+  { value: "owner", label: "Owner" },
+  { value: "company_admin", label: "Company Admin" },
+  { value: "project_manager", label: "Project Manager" },
+  { value: "site_engineer", label: "Site Engineer" },
+  { value: "supervisor", label: "Supervisor" },
+  { value: "storekeeper", label: "Storekeeper" },
+];
+
 const emptyReportingData: ReportingData = {
   progress: [],
   manpower: [],
@@ -145,6 +177,25 @@ const emptyReportingData: ReportingData = {
   media: [],
   access: noReportingAccess,
 };
+
+const emptyNewUserForm = {
+  name: "",
+  phone: "",
+  email: "",
+  password: "Demo12345!",
+  role: "site_engineer",
+};
+
+function defaultAssignmentForm() {
+  return {
+    userId: "",
+    roleOnProject: "site_engineer",
+    canEnterProgress: true,
+    canEnterManpower: true,
+    canEnterMaterials: false,
+    canViewDashboard: true,
+  };
+}
 
 export function App() {
   const [accessToken, setAccessToken] = useState(
@@ -160,8 +211,14 @@ export function App() {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [reportingData, setReportingData] = useState<ReportingData>(emptyReportingData);
+  const [companyUsers, setCompanyUsers] = useState<CompanyUser[]>([]);
+  const [projectAssignments, setProjectAssignments] = useState<ProjectAssignment[]>([]);
+  const [newUserForm, setNewUserForm] = useState(emptyNewUserForm);
+  const [assignmentForm, setAssignmentForm] = useState(defaultAssignmentForm);
   const [loadingMessage, setLoadingMessage] = useState("Loading companies...");
   const [errorMessage, setErrorMessage] = useState("");
+  const [teamMessage, setTeamMessage] = useState("");
+  const [teamErrorMessage, setTeamErrorMessage] = useState("");
 
   useEffect(() => {
     if (!accessToken) {
@@ -234,6 +291,41 @@ export function App() {
       });
   }, [selectedCompanyId, selectedProjectId, accessToken]);
 
+  useEffect(() => {
+    if (!selectedCompanyId || !currentUser || !isCompanyAdmin(currentUser.role)) {
+      setCompanyUsers([]);
+      setProjectAssignments([]);
+      return;
+    }
+
+    loadCompanyUsers(selectedCompanyId, accessToken)
+      .then((loadedUsers) => {
+        setCompanyUsers(loadedUsers);
+        setTeamErrorMessage("");
+      })
+      .catch((error: Error) => {
+        setCompanyUsers([]);
+        setTeamErrorMessage(error.message);
+      });
+  }, [selectedCompanyId, currentUser, accessToken]);
+
+  useEffect(() => {
+    if (!selectedCompanyId || !selectedProjectId || !currentUser || !isCompanyAdmin(currentUser.role)) {
+      setProjectAssignments([]);
+      return;
+    }
+
+    loadProjectAssignments(selectedCompanyId, selectedProjectId, accessToken)
+      .then((loadedAssignments) => {
+        setProjectAssignments(loadedAssignments);
+        setTeamErrorMessage("");
+      })
+      .catch((error: Error) => {
+        setProjectAssignments([]);
+        setTeamErrorMessage(error.message);
+      });
+  }, [selectedCompanyId, selectedProjectId, currentUser, accessToken]);
+
   const filteredData = useMemo(
     () => filterReportingData(reportingData, fromDate, toDate),
     [reportingData, fromDate, toDate],
@@ -243,6 +335,7 @@ export function App() {
   const analytics = useMemo(() => buildDashboardAnalytics(filteredData), [filteredData]);
   const selectedCompany = companies.find((company) => company.id === selectedCompanyId);
   const selectedProject = projects.find((project) => project.id === selectedProjectId);
+  const canManageTeam = currentUser ? isCompanyAdmin(currentUser.role) : false;
   const visibleModules = useMemo(
     () => buildVisibleModules(currentUser, reportingData),
     [currentUser, reportingData],
@@ -268,6 +361,47 @@ export function App() {
     } catch (error) {
       setLoadingMessage("");
       setErrorMessage(error instanceof Error ? error.message : "Login failed.");
+    }
+  }
+
+  async function handleCreateUser(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selectedCompanyId) {
+      return;
+    }
+
+    setTeamMessage("");
+    setTeamErrorMessage("");
+    try {
+      const createdUser = await createCompanyUser(selectedCompanyId, accessToken, newUserForm);
+      setCompanyUsers((existingUsers) => [createdUser, ...existingUsers]);
+      setNewUserForm(emptyNewUserForm);
+      setTeamMessage(`Created ${createdUser.name}.`);
+    } catch (error) {
+      setTeamErrorMessage(error instanceof Error ? error.message : "Could not create user.");
+    }
+  }
+
+  async function handleAssignUser(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selectedCompanyId || !selectedProjectId || !assignmentForm.userId) {
+      return;
+    }
+
+    setTeamMessage("");
+    setTeamErrorMessage("");
+    try {
+      const createdAssignment = await assignUserToProject(
+        selectedCompanyId,
+        selectedProjectId,
+        accessToken,
+        assignmentForm,
+      );
+      setProjectAssignments((existingAssignments) => [createdAssignment, ...existingAssignments]);
+      setAssignmentForm(defaultAssignmentForm());
+      setTeamMessage("User assigned to the selected project.");
+    } catch (error) {
+      setTeamErrorMessage(error instanceof Error ? error.message : "Could not assign user.");
     }
   }
 
@@ -406,6 +540,22 @@ export function App() {
 
         {loadingMessage ? <p className="status-message">{loadingMessage}</p> : null}
         {errorMessage ? <p className="error-message">{errorMessage}</p> : null}
+
+        {canManageTeam ? (
+          <TeamManagementPanel
+            users={companyUsers}
+            assignments={projectAssignments}
+            selectedProject={selectedProject}
+            newUserForm={newUserForm}
+            assignmentForm={assignmentForm}
+            teamMessage={teamMessage}
+            teamErrorMessage={teamErrorMessage}
+            onNewUserFormChange={setNewUserForm}
+            onAssignmentFormChange={setAssignmentForm}
+            onCreateUser={handleCreateUser}
+            onAssignUser={handleAssignUser}
+          />
+        ) : null}
 
         <section className="card-grid" aria-label="Summary cards">
           {summaryCards.map((card) => (
@@ -679,6 +829,255 @@ function RestrictedPanel({ title, message }: { title: string; message: string })
   );
 }
 
+function TeamManagementPanel({
+  users,
+  assignments,
+  selectedProject,
+  newUserForm,
+  assignmentForm,
+  teamMessage,
+  teamErrorMessage,
+  onNewUserFormChange,
+  onAssignmentFormChange,
+  onCreateUser,
+  onAssignUser,
+}: {
+  users: CompanyUser[];
+  assignments: ProjectAssignment[];
+  selectedProject: Project | undefined;
+  newUserForm: typeof emptyNewUserForm;
+  assignmentForm: ReturnType<typeof defaultAssignmentForm>;
+  teamMessage: string;
+  teamErrorMessage: string;
+  onNewUserFormChange: (form: typeof emptyNewUserForm) => void;
+  onAssignmentFormChange: (form: ReturnType<typeof defaultAssignmentForm>) => void;
+  onCreateUser: (event: FormEvent<HTMLFormElement>) => void;
+  onAssignUser: (event: FormEvent<HTMLFormElement>) => void;
+}) {
+  const assignedUserIds = new Set(assignments.map((assignment) => assignment.user_id));
+  const assignableUsers = users.filter((user) => !assignedUserIds.has(user.id));
+
+  function handleAssignmentRoleChange(role: string) {
+    onAssignmentFormChange({
+      ...assignmentForm,
+      roleOnProject: role,
+      ...defaultPermissionsForRole(role),
+    });
+  }
+
+  return (
+    <section className="team-section" id="team">
+      <div className="section-heading">
+        <p className="eyebrow">Team management</p>
+        <h3>Manage company users and project access</h3>
+        <p>
+          Owner/admin users can add team members and assign them to the selected project with
+          progress, manpower, material, and dashboard permissions.
+        </p>
+      </div>
+
+      {teamMessage ? <p className="status-message">{teamMessage}</p> : null}
+      {teamErrorMessage ? <p className="error-message">{teamErrorMessage}</p> : null}
+
+      <section className="dashboard-grid">
+        <article className="panel">
+          <h3>Add user</h3>
+          <form className="stacked-form" onSubmit={onCreateUser}>
+            <label>
+              Name
+              <input
+                value={newUserForm.name}
+                onChange={(event) =>
+                  onNewUserFormChange({ ...newUserForm, name: event.target.value })
+                }
+                placeholder="Site Engineer"
+                required
+              />
+            </label>
+            <label>
+              Phone / WhatsApp number
+              <input
+                value={newUserForm.phone}
+                onChange={(event) =>
+                  onNewUserFormChange({ ...newUserForm, phone: event.target.value })
+                }
+                placeholder="+919999999999"
+                required
+              />
+            </label>
+            <label>
+              Email
+              <input
+                type="email"
+                value={newUserForm.email}
+                onChange={(event) =>
+                  onNewUserFormChange({ ...newUserForm, email: event.target.value })
+                }
+                placeholder="user@example.com"
+              />
+            </label>
+            <label>
+              Temporary password
+              <input
+                type="password"
+                value={newUserForm.password}
+                onChange={(event) =>
+                  onNewUserFormChange({ ...newUserForm, password: event.target.value })
+                }
+                minLength={8}
+                placeholder="At least 8 characters"
+              />
+            </label>
+            <label>
+              Company role
+              <select
+                value={newUserForm.role}
+                onChange={(event) =>
+                  onNewUserFormChange({ ...newUserForm, role: event.target.value })
+                }
+              >
+                {roleOptions.map((role) => (
+                  <option value={role.value} key={role.value}>
+                    {role.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button type="submit">Create user</button>
+          </form>
+        </article>
+
+        <article className="panel">
+          <h3>Assign to selected project</h3>
+          <p>
+            Selected project: <strong>{selectedProject?.name ?? "No project selected"}</strong>
+          </p>
+          <form className="stacked-form" onSubmit={onAssignUser}>
+            <label>
+              User
+              <select
+                value={assignmentForm.userId}
+                onChange={(event) =>
+                  onAssignmentFormChange({ ...assignmentForm, userId: event.target.value })
+                }
+                required
+              >
+                <option value="">Choose user</option>
+                {assignableUsers.map((user) => (
+                  <option value={user.id} key={user.id}>
+                    {user.name} ({formatRole(user.role)})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Project role
+              <select
+                value={assignmentForm.roleOnProject}
+                onChange={(event) => handleAssignmentRoleChange(event.target.value)}
+              >
+                {roleOptions.map((role) => (
+                  <option value={role.value} key={role.value}>
+                    {role.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="checkbox-grid">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={assignmentForm.canEnterProgress}
+                  onChange={(event) =>
+                    onAssignmentFormChange({
+                      ...assignmentForm,
+                      canEnterProgress: event.target.checked,
+                    })
+                  }
+                />
+                Progress
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={assignmentForm.canEnterManpower}
+                  onChange={(event) =>
+                    onAssignmentFormChange({
+                      ...assignmentForm,
+                      canEnterManpower: event.target.checked,
+                    })
+                  }
+                />
+                Manpower
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={assignmentForm.canEnterMaterials}
+                  onChange={(event) =>
+                    onAssignmentFormChange({
+                      ...assignmentForm,
+                      canEnterMaterials: event.target.checked,
+                    })
+                  }
+                />
+                Materials
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={assignmentForm.canViewDashboard}
+                  onChange={(event) =>
+                    onAssignmentFormChange({
+                      ...assignmentForm,
+                      canViewDashboard: event.target.checked,
+                    })
+                  }
+                />
+                Dashboard
+              </label>
+            </div>
+            <button type="submit" disabled={!selectedProject || assignableUsers.length === 0}>
+              Assign user
+            </button>
+          </form>
+        </article>
+      </section>
+
+      <section className="dashboard-grid">
+        <ReportingTable
+          title="Company users"
+          emptyMessage="No users have been added yet."
+          columns={["Name", "Role", "Phone", "Email", "Status"]}
+          rows={users.map((user) => [
+            user.name,
+            formatRole(user.role),
+            user.phone,
+            user.email ?? "-",
+            user.is_active ? "Active" : "Inactive",
+          ])}
+        />
+        <ReportingTable
+          title="Selected project team"
+          emptyMessage="No users are assigned to this project yet."
+          columns={["User", "Project role", "Progress", "Manpower", "Materials", "Dashboard"]}
+          rows={assignments.map((assignment) => {
+            const user = users.find((candidate) => candidate.id === assignment.user_id);
+            return [
+              user?.name ?? assignment.user_id,
+              formatRole(assignment.role_on_project),
+              yesNo(assignment.can_enter_progress),
+              yesNo(assignment.can_enter_manpower),
+              yesNo(assignment.can_enter_materials),
+              yesNo(assignment.can_view_dashboard),
+            ];
+          })}
+        />
+      </section>
+    </section>
+  );
+}
+
 async function login(identifier: string, password: string): Promise<LoginResponse> {
   const response = await fetch("/api/auth/login", {
     method: "POST",
@@ -705,6 +1104,62 @@ async function loadCompanies(accessToken: string): Promise<Company[]> {
 
 async function loadProjects(companyId: string, accessToken: string): Promise<Project[]> {
   return apiRequest<Project[]>(`/api/companies/${companyId}/projects`, accessToken);
+}
+
+async function loadCompanyUsers(companyId: string, accessToken: string): Promise<CompanyUser[]> {
+  return apiRequest<CompanyUser[]>(`/api/companies/${companyId}/users`, accessToken);
+}
+
+async function loadProjectAssignments(
+  companyId: string,
+  projectId: string,
+  accessToken: string,
+): Promise<ProjectAssignment[]> {
+  return apiRequest<ProjectAssignment[]>(
+    `/api/companies/${companyId}/projects/${projectId}/users`,
+    accessToken,
+  );
+}
+
+async function createCompanyUser(
+  companyId: string,
+  accessToken: string,
+  form: typeof emptyNewUserForm,
+): Promise<CompanyUser> {
+  return apiRequest<CompanyUser>(`/api/companies/${companyId}/users`, accessToken, {
+    method: "POST",
+    body: JSON.stringify({
+      name: form.name.trim(),
+      phone: form.phone.trim(),
+      email: form.email.trim() || null,
+      password: form.password.trim() || undefined,
+      role: form.role,
+      is_active: true,
+    }),
+  });
+}
+
+async function assignUserToProject(
+  companyId: string,
+  projectId: string,
+  accessToken: string,
+  form: ReturnType<typeof defaultAssignmentForm>,
+): Promise<ProjectAssignment> {
+  return apiRequest<ProjectAssignment>(
+    `/api/companies/${companyId}/projects/${projectId}/users`,
+    accessToken,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        user_id: form.userId,
+        role_on_project: form.roleOnProject,
+        can_enter_progress: form.canEnterProgress,
+        can_enter_manpower: form.canEnterManpower,
+        can_enter_materials: form.canEnterMaterials,
+        can_view_dashboard: form.canViewDashboard,
+      }),
+    },
+  );
 }
 
 async function loadReportingData(
@@ -769,20 +1224,39 @@ class ApiRequestError extends Error {
   }
 }
 
-async function apiRequest<T>(path: string, accessToken?: string): Promise<T> {
+async function apiRequest<T>(
+  path: string,
+  accessToken?: string,
+  options: RequestInit = {},
+): Promise<T> {
   const response = await fetch(path, {
+    ...options,
     headers: {
+      ...(options.body ? { "Content-Type": "application/json" } : {}),
       ...(accessToken
         ? { Authorization: `Bearer ${accessToken}` }
         : { "X-Platform-Admin-Token": PLATFORM_ADMIN_TOKEN }),
+      ...options.headers,
     },
   });
 
   if (!response.ok) {
-    throw new ApiRequestError(response.status, response.statusText);
+    throw new ApiRequestError(response.status, await errorDetail(response));
   }
 
   return response.json() as Promise<T>;
+}
+
+async function errorDetail(response: Response): Promise<string> {
+  try {
+    const body = (await response.json()) as { detail?: unknown };
+    if (typeof body.detail === "string") {
+      return body.detail;
+    }
+  } catch {
+    // Fall back to HTTP status text when the API does not return JSON.
+  }
+  return response.statusText;
 }
 
 function filterReportingData(data: ReportingData, fromDate: string, toDate: string): ReportingData {
@@ -1012,7 +1486,9 @@ function buildVisibleModules(
   const expectedAccess = expectedAccessForRole(user.role);
   const canSeeProgress = hasLoadedAccess ? access.progress : expectedAccess.progress;
   const canSeeManpower = hasLoadedAccess ? access.manpower : expectedAccess.manpower;
-  const canSeeMaterials = hasLoadedAccess ? access.materials || access.stock : expectedAccess.materials;
+  const canSeeMaterials = hasLoadedAccess
+    ? access.materials || access.stock
+    : expectedAccess.materials;
   const canSeeImages = hasLoadedAccess ? access.media : expectedAccess.media;
   const isAdmin = isCompanyAdmin(user.role);
 
@@ -1070,8 +1546,45 @@ function expectedAccessForRole(role: string): ReportingAccess {
   return noReportingAccess;
 }
 
+function defaultPermissionsForRole(role: string) {
+  if (isCompanyAdmin(role) || role === "project_manager") {
+    return {
+      canEnterProgress: true,
+      canEnterManpower: true,
+      canEnterMaterials: true,
+      canViewDashboard: true,
+    };
+  }
+  if (role === "site_engineer" || role === "supervisor") {
+    return {
+      canEnterProgress: true,
+      canEnterManpower: true,
+      canEnterMaterials: false,
+      canViewDashboard: true,
+    };
+  }
+  if (role === "storekeeper") {
+    return {
+      canEnterProgress: false,
+      canEnterManpower: false,
+      canEnterMaterials: true,
+      canViewDashboard: true,
+    };
+  }
+  return {
+    canEnterProgress: false,
+    canEnterManpower: false,
+    canEnterMaterials: false,
+    canViewDashboard: false,
+  };
+}
+
 function isCompanyAdmin(role: string | undefined): boolean {
   return role === "owner" || role === "admin" || role === "company_admin";
+}
+
+function yesNo(value: boolean): string {
+  return value ? "Yes" : "No";
 }
 
 function formatRole(role: string | undefined): string {

@@ -69,6 +69,15 @@ It includes company/project selection, date range filters, summary cards, projec
 
 This is still a development dashboard. The backend enforces role-aware API access, and the frontend now adapts the visible navigation, analytics, reporting tables, and export buttons to the signed-in user's role.
 
+Owner/admin users can also use the first team-management panel to:
+
+- view company users
+- create company users
+- view selected-project assignments
+- assign users to the selected project with progress, manpower, material, and dashboard permissions
+
+Editing users, deactivating users, and removing project assignments are not implemented yet.
+
 ## Seed demo data
 
 After the backend is running, create a realistic demo dataset:
