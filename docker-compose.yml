@@ -22,6 +22,7 @@ services:
       APP_NAME: Cognos AI
       APP_VERSION: 0.1.0
       ENVIRONMENT: local
+      PLATFORM_ADMIN_TOKEN: local-dev-platform-admin-token
       DATABASE_URL: postgresql+psycopg://cognos:cognos@db:5432/cognos_ai
     ports:
       - "8000:8000"

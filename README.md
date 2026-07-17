@@ -43,6 +43,15 @@ Local development setup:
 
 - `docs/LOCAL_DEVELOPMENT.md`
 
+Current foundation includes:
+
+- backend health check
+- PostgreSQL migration setup
+- company setup APIs
+- user setup APIs
+- project setup APIs
+- project-user assignment APIs
+
 ## Planned architecture
 
 - Backend: Python/FastAPI
