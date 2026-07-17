@@ -296,6 +296,9 @@ Acceptance criteria:
 - owner/admin can edit projects
 - project has name, code, location, status, start date, and end date
 - users can be assigned to projects
+- dashboard can create projects with name, code, location, schedule dates, status, and timezone
+- dashboard can show selected-project setup details
+- dashboard project edit/archive/delete actions are still future work
 
 Dependencies:
 
