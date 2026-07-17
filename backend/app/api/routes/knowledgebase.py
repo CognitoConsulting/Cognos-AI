@@ -7,7 +7,14 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from io import BytesIO
 
-from app.api.deps import get_database_session, require_platform_admin
+from app.api.deps import (
+    AuthContext,
+    get_auth_context,
+    get_database_session,
+    require_company_admin_access,
+    require_company_member,
+    require_project_dashboard_access,
+)
 from app.models import (
     Activity,
     ActivitySynonym,
@@ -39,19 +46,17 @@ from app.schemas.knowledgebase import (
 )
 from app.services.knowledgebase_templates import build_template_workbook, import_template
 
-router = APIRouter(
-    prefix="/companies/{company_id}",
-    dependencies=[Depends(require_platform_admin)],
-)
+router = APIRouter(prefix="/companies/{company_id}")
 
 
 @router.get("/knowledgebase/templates/{template_type}")
 def download_knowledgebase_template(
     company_id: UUID,
     template_type: str,
+    auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_database_session),
 ) -> StreamingResponse:
-    _require_company(db, company_id)
+    require_company_member(db, company_id, auth)
     try:
         content = build_template_workbook(template_type)
     except ValueError as exc:
@@ -79,8 +84,10 @@ async def import_knowledgebase_template(
     upload_type: str = Form(...),
     uploaded_by: UUID | None = Form(default=None),
     file: UploadFile = File(...),
+    auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_database_session),
 ) -> KnowledgeTemplateImportResult:
+    require_company_admin_access(db, company_id, auth)
     if not file.filename or not file.filename.lower().endswith(".xlsx"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -111,9 +118,10 @@ async def import_knowledgebase_template(
 def create_unit(
     company_id: UUID,
     payload: UnitCreate,
+    auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_database_session),
 ) -> Unit:
-    _require_company(db, company_id)
+    require_company_admin_access(db, company_id, auth)
     unit = Unit(company_id=company_id, **payload.model_dump())
     return _commit_or_conflict(db, unit, "Unit already exists for this company.")
 
@@ -121,9 +129,10 @@ def create_unit(
 @router.get("/units", response_model=list[UnitRead])
 def list_units(
     company_id: UUID,
+    auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_database_session),
 ) -> list[Unit]:
-    _require_company(db, company_id)
+    require_company_member(db, company_id, auth)
     return list(
         db.scalars(select(Unit).where(Unit.company_id == company_id).order_by(Unit.name)).all()
     )
@@ -137,9 +146,10 @@ def list_units(
 def create_activity(
     company_id: UUID,
     payload: ActivityCreate,
+    auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_database_session),
 ) -> Activity:
-    _require_company(db, company_id)
+    require_company_admin_access(db, company_id, auth)
     if payload.default_unit_id:
         _require_unit_in_company(db, company_id, payload.default_unit_id)
 
@@ -150,9 +160,10 @@ def create_activity(
 @router.get("/activities", response_model=list[ActivityRead])
 def list_activities(
     company_id: UUID,
+    auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_database_session),
 ) -> list[Activity]:
-    _require_company(db, company_id)
+    require_company_member(db, company_id, auth)
     return list(
         db.scalars(
             select(Activity).where(Activity.company_id == company_id).order_by(Activity.name)
@@ -169,8 +180,10 @@ def create_activity_synonym(
     company_id: UUID,
     activity_id: UUID,
     payload: ActivitySynonymCreate,
+    auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_database_session),
 ) -> ActivitySynonym:
+    require_company_admin_access(db, company_id, auth)
     _require_activity_in_company(db, company_id, activity_id)
     synonym = ActivitySynonym(
         company_id=company_id,
@@ -187,8 +200,10 @@ def create_activity_synonym(
 def list_activity_synonyms(
     company_id: UUID,
     activity_id: UUID,
+    auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_database_session),
 ) -> list[ActivitySynonym]:
+    require_company_member(db, company_id, auth)
     _require_activity_in_company(db, company_id, activity_id)
     return list(
         db.scalars(
@@ -208,8 +223,10 @@ def create_project_location(
     company_id: UUID,
     project_id: UUID,
     payload: ProjectLocationCreate,
+    auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_database_session),
 ) -> ProjectLocation:
+    require_company_admin_access(db, company_id, auth)
     _require_project_in_company(db, company_id, project_id)
     if payload.parent_location_id:
         _require_location_in_project(db, company_id, project_id, payload.parent_location_id)
@@ -229,9 +246,10 @@ def create_project_location(
 def list_project_locations(
     company_id: UUID,
     project_id: UUID,
+    auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_database_session),
 ) -> list[ProjectLocation]:
-    _require_project_in_company(db, company_id, project_id)
+    require_project_dashboard_access(db, company_id, project_id, auth)
     return list(
         db.scalars(
             select(ProjectLocation)
@@ -251,8 +269,10 @@ def create_boq_item(
     company_id: UUID,
     project_id: UUID,
     payload: BOQItemCreate,
+    auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_database_session),
 ) -> BOQItem:
+    require_company_admin_access(db, company_id, auth)
     _require_project_in_company(db, company_id, project_id)
     if payload.unit_id:
         _require_unit_in_company(db, company_id, payload.unit_id)
@@ -270,9 +290,10 @@ def create_boq_item(
 def list_boq_items(
     company_id: UUID,
     project_id: UUID,
+    auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_database_session),
 ) -> list[BOQItem]:
-    _require_project_in_company(db, company_id, project_id)
+    require_project_dashboard_access(db, company_id, project_id, auth)
     return list(
         db.scalars(
             select(BOQItem)
@@ -292,8 +313,10 @@ def create_schedule_item(
     company_id: UUID,
     project_id: UUID,
     payload: ProjectScheduleItemCreate,
+    auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_database_session),
 ) -> ProjectScheduleItem:
+    require_company_admin_access(db, company_id, auth)
     _require_project_in_company(db, company_id, project_id)
     if payload.activity_id:
         _require_activity_in_company(db, company_id, payload.activity_id)
@@ -322,9 +345,10 @@ def create_schedule_item(
 def list_schedule_items(
     company_id: UUID,
     project_id: UUID,
+    auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_database_session),
 ) -> list[ProjectScheduleItem]:
-    _require_project_in_company(db, company_id, project_id)
+    require_project_dashboard_access(db, company_id, project_id, auth)
     return list(
         db.scalars(
             select(ProjectScheduleItem)
@@ -344,8 +368,10 @@ def create_knowledge_upload_record(
     company_id: UUID,
     project_id: UUID,
     payload: ProjectKnowledgeUploadCreate,
+    auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_database_session),
 ) -> ProjectKnowledgeUpload:
+    require_company_admin_access(db, company_id, auth)
     _require_project_in_company(db, company_id, project_id)
     if payload.uploaded_by:
         _require_user_in_company(db, company_id, payload.uploaded_by)
@@ -368,9 +394,10 @@ def create_knowledge_upload_record(
 def list_knowledge_upload_records(
     company_id: UUID,
     project_id: UUID,
+    auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_database_session),
 ) -> list[ProjectKnowledgeUpload]:
-    _require_project_in_company(db, company_id, project_id)
+    require_project_dashboard_access(db, company_id, project_id, auth)
     return list(
         db.scalars(
             select(ProjectKnowledgeUpload)

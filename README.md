@@ -63,6 +63,7 @@ Current foundation includes:
 - first project-manager analytics cards for progress by area, manpower distribution, stock highlights, and attention items
 - demo data seed script for quickly populating a realistic company/project dashboard
 - password-based login foundation with signed bearer tokens for the dashboard
+- role-aware API access for company, project, reporting, knowledgebase, and WhatsApp admin routes
 
 ## Planned architecture
 

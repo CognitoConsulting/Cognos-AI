@@ -220,7 +220,7 @@ Acceptance criteria:
 - backend returns a signed bearer token after successful login
 - dashboard can load the signed-in user's company context
 - seed demo data prints usable demo login credentials
-- temporary admin-token compatibility is documented as a short-term bridge, not final security
+- signed login tokens are not treated as platform-admin tokens
 
 Dependencies:
 
@@ -263,6 +263,10 @@ Acceptance criteria:
 - supervisor can access assigned projects only
 - storekeeper can enter material received/issued only for assigned projects
 - platform admin can manage companies
+- backend APIs enforce company isolation
+- backend reporting APIs enforce progress, manpower, and material permissions separately
+- storekeepers are blocked from progress and manpower reporting APIs
+- project users are blocked from other companies' data
 
 Dependencies:
 

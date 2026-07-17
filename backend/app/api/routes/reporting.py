@@ -5,7 +5,13 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_database_session, require_platform_admin
+from app.api.deps import (
+    AuthContext,
+    get_auth_context,
+    get_database_session,
+    require_project_dashboard_access,
+    require_project_entry_access,
+)
 from app.models import (
     Activity,
     AssistantConversationState,
@@ -34,10 +40,7 @@ from app.schemas.reporting import (
     ProgressEntryRead,
 )
 
-router = APIRouter(
-    prefix="/companies/{company_id}/projects/{project_id}/reporting",
-    dependencies=[Depends(require_platform_admin)],
-)
+router = APIRouter(prefix="/companies/{company_id}/projects/{project_id}/reporting")
 
 
 @router.post(
@@ -49,8 +52,10 @@ def create_progress_entry(
     company_id: UUID,
     project_id: UUID,
     payload: ProgressEntryCreate,
+    auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_database_session),
 ) -> ProgressEntry:
+    require_project_entry_access(db, company_id, project_id, auth, "progress")
     _validate_common_references(db, company_id, project_id, payload)
     if payload.activity_id:
         _require_activity_in_company(db, company_id, payload.activity_id)
@@ -63,9 +68,16 @@ def create_progress_entry(
 def list_progress_entries(
     company_id: UUID,
     project_id: UUID,
+    auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_database_session),
 ) -> list[ProgressEntry]:
-    _require_project_in_company(db, company_id, project_id)
+    require_project_entry_access(
+        db,
+        company_id,
+        project_id,
+        auth,
+        "progress",
+    )
     return list(
         db.scalars(
             select(ProgressEntry)
@@ -85,8 +97,10 @@ def create_manpower_entry(
     company_id: UUID,
     project_id: UUID,
     payload: ManpowerEntryCreate,
+    auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_database_session),
 ) -> ManpowerEntry:
+    require_project_entry_access(db, company_id, project_id, auth, "manpower")
     _validate_common_references(db, company_id, project_id, payload)
     entry = ManpowerEntry(company_id=company_id, project_id=project_id, **payload.model_dump())
     return _commit(db, entry)
@@ -96,9 +110,16 @@ def create_manpower_entry(
 def list_manpower_entries(
     company_id: UUID,
     project_id: UUID,
+    auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_database_session),
 ) -> list[ManpowerEntry]:
-    _require_project_in_company(db, company_id, project_id)
+    require_project_entry_access(
+        db,
+        company_id,
+        project_id,
+        auth,
+        "manpower",
+    )
     return list(
         db.scalars(
             select(ManpowerEntry)
@@ -118,8 +139,10 @@ def create_material_transaction(
     company_id: UUID,
     project_id: UUID,
     payload: MaterialTransactionCreate,
+    auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_database_session),
 ) -> MaterialTransaction:
+    require_project_entry_access(db, company_id, project_id, auth, "materials")
     _validate_common_references(db, company_id, project_id, payload)
     if payload.boq_item_id:
         _require_boq_item_in_project(db, company_id, project_id, payload.boq_item_id)
@@ -136,9 +159,16 @@ def create_material_transaction(
 def list_material_transactions(
     company_id: UUID,
     project_id: UUID,
+    auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_database_session),
 ) -> list[MaterialTransaction]:
-    _require_project_in_company(db, company_id, project_id)
+    require_project_entry_access(
+        db,
+        company_id,
+        project_id,
+        auth,
+        "materials",
+    )
     return list(
         db.scalars(
             select(MaterialTransaction)
@@ -161,8 +191,10 @@ def create_material_stock_balance(
     company_id: UUID,
     project_id: UUID,
     payload: MaterialStockBalanceCreate,
+    auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_database_session),
 ) -> MaterialStockBalance:
+    require_project_entry_access(db, company_id, project_id, auth, "materials")
     _require_project_in_company(db, company_id, project_id)
     if payload.boq_item_id:
         _require_boq_item_in_project(db, company_id, project_id, payload.boq_item_id)
@@ -181,9 +213,16 @@ def create_material_stock_balance(
 def list_material_stock_balances(
     company_id: UUID,
     project_id: UUID,
+    auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_database_session),
 ) -> list[MaterialStockBalance]:
-    _require_project_in_company(db, company_id, project_id)
+    require_project_entry_access(
+        db,
+        company_id,
+        project_id,
+        auth,
+        "materials",
+    )
     return list(
         db.scalars(
             select(MaterialStockBalance)
@@ -199,9 +238,10 @@ def create_media_file(
     company_id: UUID,
     project_id: UUID,
     payload: MediaFileCreate,
+    auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_database_session),
 ) -> MediaFile:
-    _require_project_in_company(db, company_id, project_id)
+    require_project_dashboard_access(db, company_id, project_id, auth)
     if payload.uploaded_by:
         _require_user_in_company(db, company_id, payload.uploaded_by)
     if payload.source_whatsapp_message_id:
@@ -215,9 +255,10 @@ def create_media_file(
 def list_media_files(
     company_id: UUID,
     project_id: UUID,
+    auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_database_session),
 ) -> list[MediaFile]:
-    _require_project_in_company(db, company_id, project_id)
+    require_project_dashboard_access(db, company_id, project_id, auth)
     return list(
         db.scalars(
             select(MediaFile)

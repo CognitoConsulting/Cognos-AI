@@ -67,7 +67,7 @@ After login, the dashboard stores a signed bearer token in the browser and can l
 
 It includes company/project selection, date range filters, summary cards, project-manager analytics cards, reporting tables, and CSV export buttons.
 
-This is still a development dashboard. The current login foundation proves the sign-in flow, but final production-grade role-aware frontend permissions are not implemented yet.
+This is still a development dashboard. The backend now enforces role-aware API access. The frontend still needs more role-aware screens so users only see the sections they are allowed to use.
 
 ## Seed demo data
 
@@ -128,7 +128,7 @@ X-Platform-Admin-Token: local-dev-platform-admin-token
 
 This is not the final production login system.
 
-It exists so we can safely build company/project/user setup before full role-aware authorization is implemented.
+It exists so platform admins can safely create companies and initial owner/admin users during pilot setup.
 
 The dashboard login uses:
 
@@ -136,7 +136,16 @@ The dashboard login uses:
 Authorization: Bearer <signed-login-token>
 ```
 
-For this foundation branch, a valid login token is temporarily accepted by existing protected dashboard APIs. The next security step is to replace that compatibility layer with proper company-scoped and role-scoped API permissions.
+Current backend API permission rules:
+
+- platform admin token can create companies and perform pilot setup
+- owner/admin users can manage their company, users, projects, project assignments, and knowledgebase data
+- project managers, site engineers, and supervisors can access only assigned projects
+- progress APIs require progress permission on the project
+- manpower APIs require manpower permission on the project
+- material APIs require material permission on the project
+- storekeepers can access material records for assigned projects, but not progress or manpower records
+- users cannot access another company's data
 
 ## Example API calls
 

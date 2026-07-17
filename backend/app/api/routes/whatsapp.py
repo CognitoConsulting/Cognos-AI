@@ -5,7 +5,12 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_database_session, require_platform_admin
+from app.api.deps import (
+    AuthContext,
+    get_auth_context,
+    get_database_session,
+    require_company_admin_access,
+)
 from app.models import (
     AssistantConversationState,
     AssistantParseResult,
@@ -37,14 +42,14 @@ router = APIRouter()
     "/companies/{company_id}/whatsapp/provider-accounts",
     response_model=WhatsAppProviderAccountRead,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_platform_admin)],
 )
 def create_provider_account(
     company_id: UUID,
     payload: WhatsAppProviderAccountCreate,
+    auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_database_session),
 ) -> WhatsAppProviderAccount:
-    _require_company(db, company_id)
+    require_company_admin_access(db, company_id, auth)
     account = WhatsAppProviderAccount(company_id=company_id, **payload.model_dump())
     db.add(account)
     try:
@@ -62,13 +67,13 @@ def create_provider_account(
 @router.get(
     "/companies/{company_id}/whatsapp/provider-accounts",
     response_model=list[WhatsAppProviderAccountRead],
-    dependencies=[Depends(require_platform_admin)],
 )
 def list_provider_accounts(
     company_id: UUID,
+    auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_database_session),
 ) -> list[WhatsAppProviderAccount]:
-    _require_company(db, company_id)
+    require_company_admin_access(db, company_id, auth)
     return list(
         db.scalars(
             select(WhatsAppProviderAccount)
@@ -81,13 +86,13 @@ def list_provider_accounts(
 @router.get(
     "/companies/{company_id}/whatsapp/messages",
     response_model=list[WhatsAppMessageRead],
-    dependencies=[Depends(require_platform_admin)],
 )
 def list_whatsapp_messages(
     company_id: UUID,
+    auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_database_session),
 ) -> list[WhatsAppMessage]:
-    _require_company(db, company_id)
+    require_company_admin_access(db, company_id, auth)
     return list(
         db.scalars(
             select(WhatsAppMessage)
@@ -100,13 +105,13 @@ def list_whatsapp_messages(
 @router.get(
     "/companies/{company_id}/assistant/parse-results",
     response_model=list[AssistantParseResultRead],
-    dependencies=[Depends(require_platform_admin)],
 )
 def list_assistant_parse_results(
     company_id: UUID,
+    auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_database_session),
 ) -> list[AssistantParseResult]:
-    _require_company(db, company_id)
+    require_company_admin_access(db, company_id, auth)
     return list(
         db.scalars(
             select(AssistantParseResult)
@@ -119,13 +124,13 @@ def list_assistant_parse_results(
 @router.get(
     "/companies/{company_id}/assistant/conversation-states",
     response_model=list[AssistantConversationStateRead],
-    dependencies=[Depends(require_platform_admin)],
 )
 def list_assistant_conversation_states(
     company_id: UUID,
+    auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_database_session),
 ) -> list[AssistantConversationState]:
-    _require_company(db, company_id)
+    require_company_admin_access(db, company_id, auth)
     return list(
         db.scalars(
             select(AssistantConversationState)
