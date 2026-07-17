@@ -67,7 +67,7 @@ After login, the dashboard stores a signed bearer token in the browser and can l
 
 It includes company/project selection, date range filters, summary cards, project-manager analytics cards, reporting tables, and CSV export buttons.
 
-This is still a development dashboard. The backend now enforces role-aware API access. The frontend still needs more role-aware screens so users only see the sections they are allowed to use.
+This is still a development dashboard. The backend enforces role-aware API access, and the frontend now adapts the visible navigation, analytics, reporting tables, and export buttons to the signed-in user's role.
 
 ## Seed demo data
 

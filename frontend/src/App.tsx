@@ -90,6 +90,15 @@ type ReportingData = {
   materials: MaterialTransaction[];
   stock: MaterialStockBalance[];
   media: MediaFile[];
+  access: ReportingAccess;
+};
+
+type ReportingAccess = {
+  progress: boolean;
+  manpower: boolean;
+  materials: boolean;
+  stock: boolean;
+  media: boolean;
 };
 
 type AnalyticsRow = {
@@ -107,18 +116,26 @@ type DashboardAnalytics = {
   attentionItems: AnalyticsRow[];
 };
 
-const modules = [
-  "Dashboard",
-  "Projects",
-  "Team",
-  "Knowledgebase",
-  "Progress",
-  "Manpower",
-  "Materials",
-  "Images",
-  "Exports",
-  "Settings",
-];
+const moduleDefinitions = [
+  { label: "Dashboard", id: "dashboard" },
+  { label: "Projects", id: "projects" },
+  { label: "Team", id: "team" },
+  { label: "Knowledgebase", id: "knowledgebase" },
+  { label: "Progress", id: "progress" },
+  { label: "Manpower", id: "manpower" },
+  { label: "Materials", id: "materials" },
+  { label: "Images", id: "images" },
+  { label: "Exports", id: "exports" },
+  { label: "Settings", id: "settings" },
+] as const;
+
+const noReportingAccess: ReportingAccess = {
+  progress: false,
+  manpower: false,
+  materials: false,
+  stock: false,
+  media: false,
+};
 
 const emptyReportingData: ReportingData = {
   progress: [],
@@ -126,6 +143,7 @@ const emptyReportingData: ReportingData = {
   materials: [],
   stock: [],
   media: [],
+  access: noReportingAccess,
 };
 
 export function App() {
@@ -225,6 +243,10 @@ export function App() {
   const analytics = useMemo(() => buildDashboardAnalytics(filteredData), [filteredData]);
   const selectedCompany = companies.find((company) => company.id === selectedCompanyId);
   const selectedProject = projects.find((project) => project.id === selectedProjectId);
+  const visibleModules = useMemo(
+    () => buildVisibleModules(currentUser, reportingData),
+    [currentUser, reportingData],
+  );
 
   function handleLogout() {
     localStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY);
@@ -299,9 +321,9 @@ export function App() {
         </div>
 
         <nav aria-label="Primary navigation">
-          {modules.map((module) => (
-            <a href={`#${module.toLowerCase()}`} key={module}>
-              {module}
+          {visibleModules.map((module) => (
+            <a href={`#${module.id}`} key={module.id}>
+              {module.label}
             </a>
           ))}
         </nav>
@@ -314,13 +336,17 @@ export function App() {
             <h2>Review saved site updates by company, project, and date.</h2>
             <p>
               This view reads the backend reporting records created from confirmed WhatsApp updates.
-              You are signed in as {currentUser?.name ?? "a dashboard user"}.
+              You are signed in as {currentUser?.name ?? "a dashboard user"} with{" "}
+              {formatRole(currentUser?.role)} access.
             </p>
           </div>
 
           <div className="filter-stack">
             <div className="signed-in-card">
-              <span>{currentUser?.company_name ?? "Signed in"}</span>
+              <span>
+                <strong>{currentUser?.company_name ?? "Signed in"}</strong>
+                <small>{roleAccessSummary(currentUser)}</small>
+              </span>
               <button type="button" onClick={handleLogout}>
                 Sign out
               </button>
@@ -391,21 +417,27 @@ export function App() {
         </section>
 
         <section className="dashboard-grid analytics-grid" aria-label="Project manager analytics">
-          <AnalyticsPanel
-            title="Progress by area"
-            emptyMessage="No progress quantities recorded yet."
-            rows={analytics.progressByLocation}
-          />
-          <AnalyticsPanel
-            title="Manpower distribution"
-            emptyMessage="No manpower records yet."
-            rows={analytics.manpowerByTrade}
-          />
-          <AnalyticsPanel
-            title="Material stock highlights"
-            emptyMessage="No material stock balances yet."
-            rows={analytics.stockHighlights}
-          />
+          {filteredData.access.progress ? (
+            <AnalyticsPanel
+              title="Progress by area"
+              emptyMessage="No progress quantities recorded yet."
+              rows={analytics.progressByLocation}
+            />
+          ) : null}
+          {filteredData.access.manpower ? (
+            <AnalyticsPanel
+              title="Manpower distribution"
+              emptyMessage="No manpower records yet."
+              rows={analytics.manpowerByTrade}
+            />
+          ) : null}
+          {filteredData.access.stock ? (
+            <AnalyticsPanel
+              title="Material stock highlights"
+              emptyMessage="No material stock balances yet."
+              rows={analytics.stockHighlights}
+            />
+          ) : null}
           <AnalyticsPanel
             title="Needs attention"
             emptyMessage="No attention items for this selection."
@@ -439,83 +471,121 @@ export function App() {
               these directly.
             </p>
             <div className="button-row">
-              <button onClick={() => exportCsv("progress", filteredData.progress)}>
-                Export progress
-              </button>
-              <button onClick={() => exportCsv("manpower", filteredData.manpower)}>
-                Export manpower
-              </button>
-              <button onClick={() => exportCsv("materials", filteredData.materials)}>
-                Export materials
-              </button>
+              {filteredData.access.progress ? (
+                <button onClick={() => exportCsv("progress", filteredData.progress)}>
+                  Export progress
+                </button>
+              ) : null}
+              {filteredData.access.manpower ? (
+                <button onClick={() => exportCsv("manpower", filteredData.manpower)}>
+                  Export manpower
+                </button>
+              ) : null}
+              {filteredData.access.materials ? (
+                <button onClick={() => exportCsv("materials", filteredData.materials)}>
+                  Export materials
+                </button>
+              ) : null}
             </div>
+            {!filteredData.access.progress &&
+            !filteredData.access.manpower &&
+            !filteredData.access.materials ? (
+              <p className="muted-note">
+                No exportable reporting sections are available for this role.
+              </p>
+            ) : null}
           </article>
         </section>
 
-        <ReportingTable
-          title="Progress"
-          emptyMessage="No confirmed progress entries for this selection yet."
-          columns={["Date", "Activity", "Location", "Quantity", "Status"]}
-          rows={filteredData.progress.map((entry) => [
-            entry.work_date,
-            entry.activity_name,
-            entry.location_text ?? "-",
-            `${entry.quantity} ${entry.unit_symbol ?? ""}`.trim(),
-            entry.status,
-          ])}
-        />
+        {filteredData.access.progress ? (
+          <ReportingTable
+            title="Progress"
+            emptyMessage="No confirmed progress entries for this selection yet."
+            columns={["Date", "Activity", "Location", "Quantity", "Status"]}
+            rows={filteredData.progress.map((entry) => [
+              entry.work_date,
+              entry.activity_name,
+              entry.location_text ?? "-",
+              `${entry.quantity} ${entry.unit_symbol ?? ""}`.trim(),
+              entry.status,
+            ])}
+          />
+        ) : (
+          <RestrictedPanel
+            title="Progress"
+            message="Your project role does not include progress reporting access."
+          />
+        )}
 
-        <ReportingTable
-          title="Manpower"
-          emptyMessage="No manpower entries for this selection yet."
-          columns={["Date", "Trade", "Workers", "Location", "Status"]}
-          rows={filteredData.manpower.map((entry) => [
-            entry.work_date,
-            entry.trade_name,
-            String(entry.worker_count),
-            entry.location_text ?? "-",
-            entry.status,
-          ])}
-        />
+        {filteredData.access.manpower ? (
+          <ReportingTable
+            title="Manpower"
+            emptyMessage="No manpower entries for this selection yet."
+            columns={["Date", "Trade", "Workers", "Location", "Status"]}
+            rows={filteredData.manpower.map((entry) => [
+              entry.work_date,
+              entry.trade_name,
+              String(entry.worker_count),
+              entry.location_text ?? "-",
+              entry.status,
+            ])}
+          />
+        ) : (
+          <RestrictedPanel
+            title="Manpower"
+            message="Your project role does not include manpower reporting access."
+          />
+        )}
 
-        <ReportingTable
-          title="Material movement"
-          emptyMessage="No material transactions for this selection yet."
-          columns={["Date", "Type", "Material", "Quantity", "Location", "Proof"]}
-          rows={filteredData.materials.map((entry) => [
-            entry.transaction_date,
-            entry.transaction_type,
-            entry.material_name,
-            `${entry.quantity} ${entry.unit_symbol ?? ""}`.trim(),
-            entry.location_text ?? "-",
-            entry.proof_status,
-          ])}
-        />
+        {filteredData.access.materials ? (
+          <ReportingTable
+            title="Material movement"
+            emptyMessage="No material transactions for this selection yet."
+            columns={["Date", "Type", "Material", "Quantity", "Location", "Proof"]}
+            rows={filteredData.materials.map((entry) => [
+              entry.transaction_date,
+              entry.transaction_type,
+              entry.material_name,
+              `${entry.quantity} ${entry.unit_symbol ?? ""}`.trim(),
+              entry.location_text ?? "-",
+              entry.proof_status,
+            ])}
+          />
+        ) : (
+          <RestrictedPanel
+            title="Material movement"
+            message="Your project role does not include material reporting access."
+          />
+        )}
 
         <section className="dashboard-grid">
-          <ReportingTable
-            title="Material stock"
-            emptyMessage="No stock balances yet."
-            columns={["Material", "Received", "Issued", "Balance"]}
-            rows={filteredData.stock.map((entry) => [
-              entry.material_name,
-              `${entry.total_received} ${entry.unit_symbol}`,
-              `${entry.total_issued} ${entry.unit_symbol}`,
-              `${entry.current_balance} ${entry.unit_symbol}`,
-            ])}
-          />
+          {filteredData.access.stock ? (
+            <ReportingTable
+              title="Material stock"
+              emptyMessage="No stock balances yet."
+              columns={["Material", "Received", "Issued", "Balance"]}
+              rows={filteredData.stock.map((entry) => [
+                entry.material_name,
+                `${entry.total_received} ${entry.unit_symbol}`,
+                `${entry.total_issued} ${entry.unit_symbol}`,
+                `${entry.current_balance} ${entry.unit_symbol}`,
+              ])}
+            />
+          ) : null}
 
-          <ReportingTable
-            title="Image/proof files"
-            emptyMessage="No media files yet."
-            columns={["Created", "Type", "File", "Status"]}
-            rows={filteredData.media.map((entry) => [
-              formatDateTime(entry.created_at),
-              entry.media_type,
-              entry.file_name ?? entry.caption ?? entry.storage_url,
-              entry.processing_status,
-            ])}
-          />
+          {filteredData.access.media ? (
+            <ReportingTable
+              title="Image/proof files"
+              emptyMessage="No media files yet."
+              columns={["Created", "Type", "File", "Status"]}
+              rows={filteredData.media.map((entry) => [
+                formatDateTime(entry.created_at),
+                entry.media_type,
+                entry.file_name ?? entry.caption ?? entry.storage_url,
+                entry.processing_status,
+              ])}
+            />
+          ) : null}
         </section>
       </section>
     </main>
@@ -600,6 +670,15 @@ function ReportingTable({
   );
 }
 
+function RestrictedPanel({ title, message }: { title: string; message: string }) {
+  return (
+    <article className="panel restricted-panel">
+      <h3>{title}</h3>
+      <p>{message}</p>
+    </article>
+  );
+}
+
 async function login(identifier: string, password: string): Promise<LoginResponse> {
   const response = await fetch("/api/auth/login", {
     method: "POST",
@@ -635,14 +714,59 @@ async function loadReportingData(
 ): Promise<ReportingData> {
   const basePath = `/api/companies/${companyId}/projects/${projectId}/reporting`;
   const [progress, manpower, materials, stock, media] = await Promise.all([
-    apiRequest<ProgressEntry[]>(`${basePath}/progress-entries`, accessToken),
-    apiRequest<ManpowerEntry[]>(`${basePath}/manpower-entries`, accessToken),
-    apiRequest<MaterialTransaction[]>(`${basePath}/material-transactions`, accessToken),
-    apiRequest<MaterialStockBalance[]>(`${basePath}/material-stock-balances`, accessToken),
-    apiRequest<MediaFile[]>(`${basePath}/media-files`, accessToken),
+    optionalApiRequest<ProgressEntry[]>(`${basePath}/progress-entries`, accessToken, []),
+    optionalApiRequest<ManpowerEntry[]>(`${basePath}/manpower-entries`, accessToken, []),
+    optionalApiRequest<MaterialTransaction[]>(
+      `${basePath}/material-transactions`,
+      accessToken,
+      [],
+    ),
+    optionalApiRequest<MaterialStockBalance[]>(
+      `${basePath}/material-stock-balances`,
+      accessToken,
+      [],
+    ),
+    optionalApiRequest<MediaFile[]>(`${basePath}/media-files`, accessToken, []),
   ]);
 
-  return { progress, manpower, materials, stock, media };
+  return {
+    progress: progress.data,
+    manpower: manpower.data,
+    materials: materials.data,
+    stock: stock.data,
+    media: media.data,
+    access: {
+      progress: progress.available,
+      manpower: manpower.available,
+      materials: materials.available,
+      stock: stock.available,
+      media: media.available,
+    },
+  };
+}
+
+async function optionalApiRequest<T>(
+  path: string,
+  accessToken: string,
+  fallback: T,
+): Promise<{ data: T; available: boolean }> {
+  try {
+    return { data: await apiRequest<T>(path, accessToken), available: true };
+  } catch (error) {
+    if (error instanceof ApiRequestError && error.status === 403) {
+      return { data: fallback, available: false };
+    }
+    throw error;
+  }
+}
+
+class ApiRequestError extends Error {
+  constructor(
+    public status: number,
+    public statusText: string,
+  ) {
+    super(`API request failed: ${status} ${statusText}`);
+  }
 }
 
 async function apiRequest<T>(path: string, accessToken?: string): Promise<T> {
@@ -655,7 +779,7 @@ async function apiRequest<T>(path: string, accessToken?: string): Promise<T> {
   });
 
   if (!response.ok) {
-    throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+    throw new ApiRequestError(response.status, response.statusText);
   }
 
   return response.json() as Promise<T>;
@@ -670,6 +794,7 @@ function filterReportingData(data: ReportingData, fromDate: string, toDate: stri
     ),
     stock: data.stock,
     media: data.media.filter((entry) => isDateInRange(entry.created_at.slice(0, 10), fromDate, toDate)),
+    access: data.access,
   };
 }
 
@@ -691,11 +816,19 @@ function buildSummaryCards(data: ReportingData) {
   const materialIssued = data.materials.filter((entry) => entry.transaction_type === "issued").length;
 
   return [
-    { label: "Progress entries", value: String(data.progress.length), tone: "blue" },
-    { label: "Manpower count", value: String(totalWorkers), tone: "green" },
-    { label: "Material received", value: String(materialReceived), tone: "amber" },
-    { label: "Material issued", value: String(materialIssued), tone: "rose" },
-  ];
+    data.access.progress
+      ? { label: "Progress entries", value: String(data.progress.length), tone: "blue" }
+      : null,
+    data.access.manpower
+      ? { label: "Manpower count", value: String(totalWorkers), tone: "green" }
+      : null,
+    data.access.materials
+      ? { label: "Material received", value: String(materialReceived), tone: "amber" }
+      : null,
+    data.access.materials
+      ? { label: "Material issued", value: String(materialIssued), tone: "rose" }
+      : null,
+  ].filter((card): card is { label: string; value: string; tone: string } => card !== null);
 }
 
 function buildDashboardAnalytics(data: ReportingData): DashboardAnalytics {
@@ -864,4 +997,108 @@ function formatDateRange(fromDate: string, toDate: string): string {
 
 function formatDateTime(value: string): string {
   return new Date(value).toLocaleString();
+}
+
+function buildVisibleModules(
+  user: AuthenticatedUser | null,
+  data: ReportingData,
+): typeof moduleDefinitions[number][] {
+  if (!user) {
+    return moduleDefinitions.filter((module) => module.id === "dashboard");
+  }
+
+  const access = data.access;
+  const hasLoadedAccess = Object.values(access).some(Boolean);
+  const expectedAccess = expectedAccessForRole(user.role);
+  const canSeeProgress = hasLoadedAccess ? access.progress : expectedAccess.progress;
+  const canSeeManpower = hasLoadedAccess ? access.manpower : expectedAccess.manpower;
+  const canSeeMaterials = hasLoadedAccess ? access.materials || access.stock : expectedAccess.materials;
+  const canSeeImages = hasLoadedAccess ? access.media : expectedAccess.media;
+  const isAdmin = isCompanyAdmin(user.role);
+
+  return moduleDefinitions.filter((module) => {
+    if (module.id === "dashboard" || module.id === "projects" || module.id === "exports") {
+      return true;
+    }
+    if (module.id === "team" || module.id === "knowledgebase" || module.id === "settings") {
+      return isAdmin;
+    }
+    if (module.id === "progress") {
+      return canSeeProgress;
+    }
+    if (module.id === "manpower") {
+      return canSeeManpower;
+    }
+    if (module.id === "materials") {
+      return canSeeMaterials;
+    }
+    if (module.id === "images") {
+      return canSeeImages;
+    }
+    return false;
+  });
+}
+
+function expectedAccessForRole(role: string): ReportingAccess {
+  if (isCompanyAdmin(role) || role === "project_manager") {
+    return {
+      progress: true,
+      manpower: true,
+      materials: true,
+      stock: true,
+      media: true,
+    };
+  }
+  if (role === "site_engineer" || role === "supervisor") {
+    return {
+      progress: true,
+      manpower: true,
+      materials: false,
+      stock: false,
+      media: true,
+    };
+  }
+  if (role === "storekeeper") {
+    return {
+      progress: false,
+      manpower: false,
+      materials: true,
+      stock: true,
+      media: true,
+    };
+  }
+  return noReportingAccess;
+}
+
+function isCompanyAdmin(role: string | undefined): boolean {
+  return role === "owner" || role === "admin" || role === "company_admin";
+}
+
+function formatRole(role: string | undefined): string {
+  if (!role) {
+    return "dashboard";
+  }
+  return role
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function roleAccessSummary(user: AuthenticatedUser | null): string {
+  if (!user) {
+    return "Dashboard user";
+  }
+  if (isCompanyAdmin(user.role)) {
+    return `${formatRole(user.role)} · company, team, projects, and reports`;
+  }
+  if (user.role === "project_manager") {
+    return "Project Manager · assigned project reports";
+  }
+  if (user.role === "site_engineer" || user.role === "supervisor") {
+    return `${formatRole(user.role)} · progress and manpower`;
+  }
+  if (user.role === "storekeeper") {
+    return "Storekeeper · material received and issued";
+  }
+  return `${formatRole(user.role)} · limited project access`;
 }

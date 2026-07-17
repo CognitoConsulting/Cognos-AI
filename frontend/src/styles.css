@@ -195,8 +195,19 @@ a {
 
 .signed-in-card span {
   color: #344054;
+  display: grid;
   font-size: 13px;
+  gap: 2px;
+}
+
+.signed-in-card strong {
   font-weight: 700;
+}
+
+.signed-in-card small,
+.muted-note {
+  color: #667085;
+  font-size: 12px;
 }
 
 .signed-in-card button {
@@ -276,6 +287,15 @@ a {
 .panel p,
 .panel li {
   color: #475467;
+}
+
+.restricted-panel {
+  background: #f8fafc;
+  border-style: dashed;
+}
+
+.restricted-panel h3 {
+  color: #344054;
 }
 
 .analytics-list {

@@ -267,6 +267,8 @@ Acceptance criteria:
 - backend reporting APIs enforce progress, manpower, and material permissions separately
 - storekeepers are blocked from progress and manpower reporting APIs
 - project users are blocked from other companies' data
+- dashboard navigation and reporting sections adapt to the signed-in user's role
+- dashboard handles restricted reporting APIs gracefully instead of showing a generic error
 
 Dependencies:
 
