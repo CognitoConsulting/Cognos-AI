@@ -241,6 +241,11 @@ Acceptance criteria:
 - owner/admin can deactivate users
 - owner/admin can assign users to projects
 - user phone number is captured for WhatsApp identification
+- dashboard can list company users for owner/admin users
+- dashboard can create company users with a temporary password
+- dashboard can list selected-project assignments
+- dashboard can assign users to selected projects with progress, manpower, material, and dashboard permissions
+- dashboard edit/deactivate/remove-assignment actions are still future work
 
 Dependencies:
 

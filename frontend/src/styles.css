@@ -276,6 +276,64 @@ a {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.team-section {
+  display: grid;
+  gap: 16px;
+}
+
+.section-heading {
+  background: #ffffff;
+  border: 1px solid #e4e7ec;
+  border-radius: 20px;
+  padding: 24px;
+}
+
+.section-heading h3 {
+  font-size: 28px;
+  letter-spacing: -0.03em;
+  margin: 8px 0;
+}
+
+.section-heading p {
+  color: #475467;
+  margin: 0;
+}
+
+.stacked-form {
+  display: grid;
+  gap: 12px;
+}
+
+.stacked-form label {
+  color: #475467;
+  display: grid;
+  font-size: 14px;
+  gap: 6px;
+}
+
+.stacked-form input,
+.stacked-form select {
+  border: 1px solid #d0d5dd;
+  border-radius: 12px;
+  padding: 11px 12px;
+}
+
+.checkbox-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.checkbox-grid label {
+  align-items: center;
+  background: #f8fafc;
+  border: 1px solid #eaecf0;
+  border-radius: 12px;
+  display: flex;
+  gap: 8px;
+  padding: 10px;
+}
+
 .analytics-grid {
   align-items: start;
 }
@@ -395,6 +453,11 @@ button {
 
 button:hover {
   background: #004eeb;
+}
+
+button:disabled {
+  background: #98a2b3;
+  cursor: not-allowed;
 }
 
 .table-panel {

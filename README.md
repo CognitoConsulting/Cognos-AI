@@ -65,6 +65,7 @@ Current foundation includes:
 - password-based login foundation with signed bearer tokens for the dashboard
 - role-aware API access for company, project, reporting, knowledgebase, and WhatsApp admin routes
 - role-aware dashboard navigation, reporting sections, and exports
+- first dashboard team-management UI for adding users and assigning them to projects
 
 ## Planned architecture
 
