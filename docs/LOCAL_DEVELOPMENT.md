@@ -257,6 +257,7 @@ Current behavior:
 - stores inbound messages for audit
 - marks messages from unknown numbers as `unknown_user`
 - creates a first assistant parser result
+- creates an assistant conversation state for confirmation, missing information, or professional redirect
 - does not yet send replies
 
 Send a manpower test webhook:
@@ -281,6 +282,19 @@ List assistant parse results:
 curl http://localhost:8000/companies/<company_id>/assistant/parse-results \
   -H "X-Platform-Admin-Token: local-dev-platform-admin-token"
 ```
+
+List assistant conversation states:
+
+```bash
+curl http://localhost:8000/companies/<company_id>/assistant/conversation-states \
+  -H "X-Platform-Admin-Token: local-dev-platform-admin-token"
+```
+
+Conversation states show what the assistant would do next:
+
+- `awaiting_confirmation`: the entry looks complete and should be confirmed before saving
+- `awaiting_missing_information`: the assistant needs missing details
+- `redirected`: the message was irrelevant/offensive and should be handled professionally
 
 ## Database migrations
 

@@ -7,21 +7,23 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_database_session, require_platform_admin
 from app.models import (
+    AssistantConversationState,
     AssistantParseResult,
     Company,
     User,
     WhatsAppMessage,
     WhatsAppProviderAccount,
 )
-from app.schemas.assistant import AssistantParseResultRead
+from app.schemas.assistant import AssistantConversationStateRead, AssistantParseResultRead
 from app.schemas.whatsapp import (
     WhatsAppMessageRead,
     WhatsAppProviderAccountCreate,
     WhatsAppProviderAccountRead,
     WhatsAppWebhookAccepted,
 )
-from app.services.whatsapp_provider import normalize_inbound_message
 from app.services.assistant_parser import parse_message
+from app.services.assistant_workflow import build_conversation_decision
+from app.services.whatsapp_provider import normalize_inbound_message
 
 router = APIRouter()
 
@@ -105,6 +107,25 @@ def list_assistant_parse_results(
             select(AssistantParseResult)
             .where(AssistantParseResult.company_id == company_id)
             .order_by(AssistantParseResult.created_at.desc())
+        ).all()
+    )
+
+
+@router.get(
+    "/companies/{company_id}/assistant/conversation-states",
+    response_model=list[AssistantConversationStateRead],
+    dependencies=[Depends(require_platform_admin)],
+)
+def list_assistant_conversation_states(
+    company_id: UUID,
+    db: Session = Depends(get_database_session),
+) -> list[AssistantConversationState]:
+    _require_company(db, company_id)
+    return list(
+        db.scalars(
+            select(AssistantConversationState)
+            .where(AssistantConversationState.company_id == company_id)
+            .order_by(AssistantConversationState.created_at.desc())
         ).all()
     )
 
@@ -197,8 +218,24 @@ async def receive_whatsapp_webhook(
         next_action=parsed.next_action,
     )
     db.add(parse_result)
+    db.flush()
+
+    decision = build_conversation_decision(parse_result, message.message_text)
+    conversation_state = AssistantConversationState(
+        company_id=message.company_id,
+        user_id=message.user_id,
+        whatsapp_message_id=message.id,
+        parse_result_id=parse_result.id,
+        status=decision.status,
+        pending_intent=decision.pending_intent,
+        pending_data=decision.pending_data,
+        missing_fields=decision.missing_fields,
+        confirmation_prompt=decision.confirmation_prompt,
+        last_user_message=message.message_text,
+    )
+    db.add(conversation_state)
     message.processing_status = (
-        "parsed" if message.processing_status == "received" else message.processing_status
+        decision.status if message.processing_status == "received" else message.processing_status
     )
     db.commit()
     db.refresh(message)

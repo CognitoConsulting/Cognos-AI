@@ -458,6 +458,8 @@ Acceptance criteria:
 - user can correct details
 - system saves only after confirmation
 - original message and final structured record are both stored
+- foundation conversation state is stored after each parsed WhatsApp message
+- conversation state shows whether the assistant is waiting for confirmation, missing information, or redirecting the user professionally
 
 Dependencies:
 
