@@ -27,7 +27,7 @@ Current live dashboard foundation:
 
 During local development, run the seed script and use the printed owner email with password `Demo12345!`.
 
-The current login uses a signed bearer token. Production-grade role-aware permissions still need to be completed before real customer use.
+The current login uses a signed bearer token. Backend APIs enforce role-aware access. The frontend still needs role-aware screens so users only see modules they are allowed to use.
 
 ## Local development
 

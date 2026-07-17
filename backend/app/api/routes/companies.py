@@ -5,7 +5,15 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_database_session, require_platform_admin
+from app.api.deps import (
+    AuthContext,
+    COMPANY_ADMIN_ROLES,
+    get_auth_context,
+    get_database_session,
+    require_company_admin_access,
+    require_company_member,
+    require_platform_admin,
+)
 from app.models import Company, Project, ProjectUser, User
 from app.schemas.company import CompanyCreate, CompanyRead
 from app.schemas.project import ProjectCreate, ProjectRead
@@ -13,10 +21,7 @@ from app.schemas.project_user import ProjectUserCreate, ProjectUserRead
 from app.schemas.user import UserCreate, UserRead
 from app.services.auth import hash_password
 
-router = APIRouter(
-    prefix="/companies",
-    dependencies=[Depends(require_platform_admin)],
-)
+router = APIRouter(prefix="/companies")
 
 
 @router.post(
@@ -26,6 +31,7 @@ router = APIRouter(
 )
 def create_company(
     payload: CompanyCreate,
+    _platform_admin: None = Depends(require_platform_admin),
     db: Session = Depends(get_database_session),
 ) -> Company:
     company = Company(**payload.model_dump())
@@ -36,15 +42,28 @@ def create_company(
 
 
 @router.get("", response_model=list[CompanyRead])
-def list_companies(db: Session = Depends(get_database_session)) -> list[Company]:
-    return list(db.scalars(select(Company).order_by(Company.created_at.desc())).all())
+def list_companies(
+    auth: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_database_session),
+) -> list[Company]:
+    if auth.is_platform_admin:
+        return list(db.scalars(select(Company).order_by(Company.created_at.desc())).all())
+
+    if not auth.user:
+        return []
+    company = db.get(Company, auth.user.company_id)
+    if not company:
+        return []
+    return [company]
 
 
 @router.get("/{company_id}", response_model=CompanyRead)
 def get_company(
     company_id: UUID,
+    auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_database_session),
 ) -> Company:
+    require_company_member(db, company_id, auth)
     company = db.get(Company, company_id)
     if not company:
         raise HTTPException(
@@ -62,9 +81,10 @@ def get_company(
 def create_company_user(
     company_id: UUID,
     payload: UserCreate,
+    auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_database_session),
 ) -> User:
-    _require_company(db, company_id)
+    require_company_admin_access(db, company_id, auth)
 
     user_data = payload.model_dump(exclude={"password"})
     user = User(
@@ -90,9 +110,10 @@ def create_company_user(
 @router.get("/{company_id}/users", response_model=list[UserRead])
 def list_company_users(
     company_id: UUID,
+    auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_database_session),
 ) -> list[User]:
-    _require_company(db, company_id)
+    require_company_admin_access(db, company_id, auth)
 
     return list(
         db.scalars(
@@ -111,9 +132,10 @@ def list_company_users(
 def create_company_project(
     company_id: UUID,
     payload: ProjectCreate,
+    auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_database_session),
 ) -> Project:
-    _require_company(db, company_id)
+    require_company_admin_access(db, company_id, auth)
 
     project = Project(company_id=company_id, **payload.model_dump())
     db.add(project)
@@ -125,14 +147,25 @@ def create_company_project(
 @router.get("/{company_id}/projects", response_model=list[ProjectRead])
 def list_company_projects(
     company_id: UUID,
+    auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_database_session),
 ) -> list[Project]:
-    _require_company(db, company_id)
+    user = require_company_member(db, company_id, auth)
+    if auth.is_platform_admin or (user and user.role in COMPANY_ADMIN_ROLES):
+        return list(
+            db.scalars(
+                select(Project)
+                .where(Project.company_id == company_id)
+                .order_by(Project.created_at.desc())
+            ).all()
+        )
 
     return list(
         db.scalars(
             select(Project)
+            .join(ProjectUser, ProjectUser.project_id == Project.id)
             .where(Project.company_id == company_id)
+            .where(ProjectUser.user_id == user.id)
             .order_by(Project.created_at.desc())
         ).all()
     )
@@ -147,9 +180,10 @@ def assign_user_to_project(
     company_id: UUID,
     project_id: UUID,
     payload: ProjectUserCreate,
+    auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_database_session),
 ) -> ProjectUser:
-    _require_company(db, company_id)
+    require_company_admin_access(db, company_id, auth)
     _require_project_in_company(db, company_id, project_id)
     _require_user_in_company(db, company_id, payload.user_id)
 
@@ -176,9 +210,10 @@ def assign_user_to_project(
 def list_project_users(
     company_id: UUID,
     project_id: UUID,
+    auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_database_session),
 ) -> list[ProjectUser]:
-    _require_company(db, company_id)
+    require_company_admin_access(db, company_id, auth)
     _require_project_in_company(db, company_id, project_id)
 
     return list(
