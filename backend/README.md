@@ -49,6 +49,8 @@ The first foundation APIs allow platform-admin setup of:
 - BOQ/material items
 - project schedule items
 - project knowledge upload tracking
+- sample Excel template download
+- Excel template upload/import
 
 During local development, these APIs require:
 
@@ -57,4 +59,16 @@ X-Platform-Admin-Token: local-dev-platform-admin-token
 ```
 
 This is a temporary foundation gate, not the final production authentication system.
+
+## Knowledgebase template imports
+
+The backend can now generate and import `.xlsx` templates for:
+
+- units
+- activities
+- locations
+- BOQ/material list
+- schedule
+
+This is the foundation for the dashboard upload workflow.
 

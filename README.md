@@ -52,6 +52,7 @@ Current foundation includes:
 - project setup APIs
 - project-user assignment APIs
 - project knowledgebase APIs for units, activities, locations, BOQ items, schedule items, and upload tracking
+- project knowledgebase Excel template download and import foundation
 
 ## Planned architecture
 

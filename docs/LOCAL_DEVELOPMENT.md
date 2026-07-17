@@ -177,6 +177,40 @@ curl -X POST http://localhost:8000/companies/<company_id>/projects/<project_id>/
   -d "{\"upload_type\":\"boq\",\"file_name\":\"boq-template.xlsx\",\"uploaded_by\":\"<user_id>\",\"status\":\"imported\"}"
 ```
 
+Download a sample template:
+
+```bash
+curl -L http://localhost:8000/companies/<company_id>/knowledgebase/templates/boq \
+  -H "X-Platform-Admin-Token: local-dev-platform-admin-token" \
+  -o boq_template.xlsx
+```
+
+Supported template types:
+
+- `units`
+- `activities`
+- `locations`
+- `boq`
+- `schedule`
+
+Upload and import a completed template:
+
+```bash
+curl -X POST http://localhost:8000/companies/<company_id>/projects/<project_id>/knowledge-uploads/import \
+  -H "X-Platform-Admin-Token: local-dev-platform-admin-token" \
+  -F "upload_type=boq" \
+  -F "uploaded_by=<user_id>" \
+  -F "file=@boq_template.xlsx"
+```
+
+Import behavior:
+
+- validates required columns
+- imports valid rows
+- skips duplicate known records where possible
+- records failed uploads with readable errors
+- stores upload history in `project_knowledge_uploads`
+
 ## Database migrations
 
 Migrations run automatically when the backend container starts.

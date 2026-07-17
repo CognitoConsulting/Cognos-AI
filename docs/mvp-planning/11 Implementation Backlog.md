@@ -283,6 +283,7 @@ Acceptance criteria:
 - downloadable templates exist for BOQ/material list
 - downloadable templates exist for units
 - optional templates exist for scope of work and resource plan
+- foundation API can generate `.xlsx` templates for units, activities, locations, BOQ, and schedule
 
 Dependencies:
 
@@ -304,6 +305,7 @@ Acceptance criteria:
 - system imports valid rows
 - upload history is visible
 - knowledgebase is linked to the correct project
+- foundation API can import `.xlsx` templates for units, activities, locations, BOQ, and schedule
 
 Dependencies:
 
