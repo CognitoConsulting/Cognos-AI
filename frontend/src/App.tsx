@@ -68,6 +68,51 @@ type KnowledgeTemplateImportResult = {
   errors: string[];
 };
 
+type DailySummarySetting = {
+  id: string;
+  company_id: string;
+  project_id: string;
+  enabled: boolean;
+  send_time_local: string;
+  timezone: string;
+  recipient_scope: string;
+  created_at: string;
+  updated_at: string;
+};
+
+type DailySummaryPreview = {
+  project_id: string;
+  summary_date: string;
+  summary_text: string;
+  recipient_count: number;
+  send_time_local: string;
+  timezone: string;
+};
+
+type DailySummaryMessage = {
+  id: string;
+  company_id: string;
+  project_id: string;
+  summary_date: string;
+  summary_text: string;
+  recipient_user_id: string | null;
+  recipient_phone: string | null;
+  whatsapp_message_id: string | null;
+  delivery_status: string;
+  trigger_type: string;
+  triggered_by_user_id: string | null;
+  created_at: string;
+};
+
+type DailySummarySendResult = {
+  project_id: string;
+  summary_date: string;
+  recipient_count: number;
+  sent_count: number;
+  skipped_count: number;
+  messages: DailySummaryMessage[];
+};
+
 type AuthenticatedUser = {
   id: string;
   company_id: string;
@@ -239,6 +284,13 @@ const emptyNewProjectForm = {
   timezone: "Asia/Kolkata",
 };
 
+const emptyDailySummaryForm = {
+  enabled: true,
+  sendTimeLocal: "19:00",
+  timezone: "Asia/Kolkata",
+  recipientScope: "dashboard_users",
+};
+
 function defaultAssignmentForm() {
   return {
     userId: "",
@@ -272,6 +324,11 @@ export function App() {
   const [assignmentForm, setAssignmentForm] = useState(defaultAssignmentForm);
   const [knowledgeTemplateType, setKnowledgeTemplateType] = useState("boq");
   const [knowledgeFile, setKnowledgeFile] = useState<File | null>(null);
+  const [dailySummarySetting, setDailySummarySetting] = useState<DailySummarySetting | null>(null);
+  const [dailySummaryPreview, setDailySummaryPreview] = useState<DailySummaryPreview | null>(null);
+  const [dailySummaryMessages, setDailySummaryMessages] = useState<DailySummaryMessage[]>([]);
+  const [dailySummaryForm, setDailySummaryForm] = useState(emptyDailySummaryForm);
+  const [dailySummaryDate, setDailySummaryDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [loadingMessage, setLoadingMessage] = useState("Loading companies...");
   const [errorMessage, setErrorMessage] = useState("");
   const [projectMessage, setProjectMessage] = useState("");
@@ -280,6 +337,8 @@ export function App() {
   const [teamErrorMessage, setTeamErrorMessage] = useState("");
   const [knowledgeMessage, setKnowledgeMessage] = useState("");
   const [knowledgeErrorMessage, setKnowledgeErrorMessage] = useState("");
+  const [dailySummaryMessage, setDailySummaryMessage] = useState("");
+  const [dailySummaryErrorMessage, setDailySummaryErrorMessage] = useState("");
 
   useEffect(() => {
     if (!accessToken) {
@@ -404,6 +463,30 @@ export function App() {
       });
   }, [selectedCompanyId, selectedProjectId, currentUser, accessToken]);
 
+  useEffect(() => {
+    if (!selectedCompanyId || !selectedProjectId || !currentUser || !isCompanyAdmin(currentUser.role)) {
+      setDailySummarySetting(null);
+      setDailySummaryPreview(null);
+      setDailySummaryMessages([]);
+      return;
+    }
+
+    loadDailySummaryWorkspace(selectedCompanyId, selectedProjectId, accessToken, dailySummaryDate)
+      .then(({ setting, preview, messages }) => {
+        setDailySummarySetting(setting);
+        setDailySummaryPreview(preview);
+        setDailySummaryMessages(messages);
+        setDailySummaryForm(formFromDailySummarySetting(setting));
+        setDailySummaryErrorMessage("");
+      })
+      .catch((error: Error) => {
+        setDailySummarySetting(null);
+        setDailySummaryPreview(null);
+        setDailySummaryMessages([]);
+        setDailySummaryErrorMessage(error.message);
+      });
+  }, [selectedCompanyId, selectedProjectId, currentUser, accessToken, dailySummaryDate]);
+
   const filteredData = useMemo(
     () => filterReportingData(reportingData, fromDate, toDate),
     [reportingData, fromDate, toDate],
@@ -420,6 +503,7 @@ export function App() {
   const canManageTeam = currentUser ? isCompanyAdmin(currentUser.role) : false;
   const canManageProjects = currentUser ? isCompanyAdmin(currentUser.role) : false;
   const canManageKnowledgebase = currentUser ? isCompanyAdmin(currentUser.role) : false;
+  const canManageDailySummary = currentUser ? isCompanyAdmin(currentUser.role) : false;
   const canExportWorkbook =
     filteredData.access.progress ||
     filteredData.access.manpower ||
@@ -564,6 +648,91 @@ export function App() {
     } catch (error) {
       setKnowledgeErrorMessage(
         error instanceof Error ? error.message : "Could not import template.",
+      );
+    }
+  }
+
+  async function handleSaveDailySummarySettings(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selectedCompanyId || !selectedProjectId) {
+      return;
+    }
+
+    setDailySummaryMessage("");
+    setDailySummaryErrorMessage("");
+    try {
+      const setting = await updateDailySummarySetting(
+        selectedCompanyId,
+        selectedProjectId,
+        accessToken,
+        dailySummaryForm,
+      );
+      const preview = await previewDailySummary(
+        selectedCompanyId,
+        selectedProjectId,
+        accessToken,
+        dailySummaryDate,
+      );
+      setDailySummarySetting(setting);
+      setDailySummaryPreview(preview);
+      setDailySummaryForm(formFromDailySummarySetting(setting));
+      setDailySummaryMessage("Daily summary settings saved.");
+    } catch (error) {
+      setDailySummaryErrorMessage(
+        error instanceof Error ? error.message : "Could not save daily summary settings.",
+      );
+    }
+  }
+
+  async function handleRefreshDailySummaryPreview() {
+    if (!selectedCompanyId || !selectedProjectId) {
+      return;
+    }
+
+    setDailySummaryMessage("");
+    setDailySummaryErrorMessage("");
+    try {
+      const preview = await previewDailySummary(
+        selectedCompanyId,
+        selectedProjectId,
+        accessToken,
+        dailySummaryDate,
+      );
+      setDailySummaryPreview(preview);
+      setDailySummaryMessage("Daily summary preview refreshed.");
+    } catch (error) {
+      setDailySummaryErrorMessage(
+        error instanceof Error ? error.message : "Could not refresh daily summary preview.",
+      );
+    }
+  }
+
+  async function handleSendDailySummaryNow() {
+    if (!selectedCompanyId || !selectedProjectId) {
+      return;
+    }
+
+    setDailySummaryMessage("");
+    setDailySummaryErrorMessage("");
+    try {
+      const result = await sendDailySummaryNow(
+        selectedCompanyId,
+        selectedProjectId,
+        accessToken,
+        dailySummaryDate,
+      );
+      const messages = await loadDailySummaryMessages(
+        selectedCompanyId,
+        selectedProjectId,
+        accessToken,
+      );
+      setDailySummaryMessages(messages);
+      setDailySummaryMessage(
+        `Daily summary sent to ${result.sent_count} recipient(s), skipped ${result.skipped_count}.`,
+      );
+    } catch (error) {
+      setDailySummaryErrorMessage(
+        error instanceof Error ? error.message : "Could not send daily summary.",
       );
     }
   }
@@ -744,6 +913,24 @@ export function App() {
             onFileChange={setKnowledgeFile}
             onDownloadTemplate={handleDownloadKnowledgeTemplate}
             onImportTemplate={handleImportKnowledgeTemplate}
+          />
+        ) : null}
+
+        {canManageDailySummary ? (
+          <DailySummaryManagementPanel
+            selectedProject={selectedProject}
+            setting={dailySummarySetting}
+            preview={dailySummaryPreview}
+            messages={dailySummaryMessages}
+            form={dailySummaryForm}
+            summaryDate={dailySummaryDate}
+            dailySummaryMessage={dailySummaryMessage}
+            dailySummaryErrorMessage={dailySummaryErrorMessage}
+            onFormChange={setDailySummaryForm}
+            onSummaryDateChange={setDailySummaryDate}
+            onSaveSettings={handleSaveDailySummarySettings}
+            onRefreshPreview={handleRefreshDailySummaryPreview}
+            onSendNow={handleSendDailySummaryNow}
           />
         ) : null}
 
@@ -1329,6 +1516,176 @@ function KnowledgebaseManagementPanel({
   );
 }
 
+function DailySummaryManagementPanel({
+  selectedProject,
+  setting,
+  preview,
+  messages,
+  form,
+  summaryDate,
+  dailySummaryMessage,
+  dailySummaryErrorMessage,
+  onFormChange,
+  onSummaryDateChange,
+  onSaveSettings,
+  onRefreshPreview,
+  onSendNow,
+}: {
+  selectedProject: Project | undefined;
+  setting: DailySummarySetting | null;
+  preview: DailySummaryPreview | null;
+  messages: DailySummaryMessage[];
+  form: typeof emptyDailySummaryForm;
+  summaryDate: string;
+  dailySummaryMessage: string;
+  dailySummaryErrorMessage: string;
+  onFormChange: (form: typeof emptyDailySummaryForm) => void;
+  onSummaryDateChange: (summaryDate: string) => void;
+  onSaveSettings: (event: FormEvent<HTMLFormElement>) => void;
+  onRefreshPreview: () => void;
+  onSendNow: () => void;
+}) {
+  return (
+    <section className="management-section" id="settings">
+      <div className="section-heading reporting-heading">
+        <div>
+          <p className="eyebrow">Daily WhatsApp summary</p>
+          <h3>Configure automatic project summaries</h3>
+          <p>
+            Control the daily project summary sent on WhatsApp. The MVP default is 7:00 PM in the
+            project&apos;s local timezone.
+          </p>
+        </div>
+        <div className="health-row" aria-label="Daily summary status">
+          <span className={`health-pill ${form.enabled ? "normal" : "warning"}`}>
+            {form.enabled ? "Enabled" : "Disabled"}
+          </span>
+          <span className="health-pill">Recipients: {preview?.recipient_count ?? 0}</span>
+        </div>
+      </div>
+
+      {dailySummaryMessage ? <p className="status-message">{dailySummaryMessage}</p> : null}
+      {dailySummaryErrorMessage ? (
+        <p className="error-message">{dailySummaryErrorMessage}</p>
+      ) : null}
+
+      <section className="dashboard-grid">
+        <article className="panel">
+          <h3>Summary settings</h3>
+          <p>
+            Selected project: <strong>{selectedProject?.name ?? "No project selected"}</strong>
+          </p>
+          <form className="stacked-form" onSubmit={onSaveSettings}>
+            <label className="inline-check">
+              <input
+                type="checkbox"
+                checked={form.enabled}
+                onChange={(event) => onFormChange({ ...form, enabled: event.target.checked })}
+              />
+              Send automatic daily summary
+            </label>
+            <label>
+              Send time
+              <input
+                type="time"
+                value={form.sendTimeLocal}
+                onChange={(event) =>
+                  onFormChange({ ...form, sendTimeLocal: event.target.value })
+                }
+                required
+              />
+            </label>
+            <label>
+              Timezone
+              <input
+                value={form.timezone}
+                onChange={(event) => onFormChange({ ...form, timezone: event.target.value })}
+                placeholder="Asia/Kolkata"
+                required
+              />
+            </label>
+            <label>
+              Recipients
+              <select
+                value={form.recipientScope}
+                onChange={(event) =>
+                  onFormChange({ ...form, recipientScope: event.target.value })
+                }
+              >
+                <option value="dashboard_users">Project users with dashboard access</option>
+              </select>
+            </label>
+            <button type="submit" disabled={!selectedProject}>
+              Save summary settings
+            </button>
+          </form>
+          {setting ? (
+            <p className="muted-note">
+              Last updated {formatDateTime(setting.updated_at)}. Scheduler sends once per project
+              per local date.
+            </p>
+          ) : null}
+        </article>
+
+        <article className="panel">
+          <h3>Preview and send</h3>
+          <p>
+            Preview the WhatsApp text before sending it. Manual send uses the same outbound audit
+            path as the automatic scheduler.
+          </p>
+          <div className="stacked-form">
+            <label>
+              Summary date
+              <input
+                type="date"
+                value={summaryDate}
+                onChange={(event) => onSummaryDateChange(event.target.value)}
+              />
+            </label>
+            <div className="button-row">
+              <button type="button" disabled={!selectedProject} onClick={onRefreshPreview}>
+                Refresh preview
+              </button>
+              <button type="button" disabled={!selectedProject || !preview} onClick={onSendNow}>
+                Send now
+              </button>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <article className="panel">
+        <div className="table-title-row">
+          <div>
+            <h3>WhatsApp summary preview</h3>
+            <p>
+              Date: {preview?.summary_date ?? summaryDate} · Send time:{" "}
+              {preview ? formatTime(preview.send_time_local) : form.sendTimeLocal} · Timezone:{" "}
+              {preview?.timezone ?? form.timezone}
+            </p>
+          </div>
+          <span>{preview?.recipient_count ?? 0} recipient(s)</span>
+        </div>
+        <pre className="summary-preview">{preview?.summary_text ?? "Choose a project to preview the daily WhatsApp summary."}</pre>
+      </article>
+
+      <ReportingTable
+        title="Daily summary send history"
+        emptyMessage="No daily summaries have been sent for this project yet."
+        helper="Each row is one recipient message logged by the summary system."
+        columns={["Created", "Date", "Recipient", "Status", "Trigger"]}
+        rows={messages.map((message) => [
+          formatDateTime(message.created_at),
+          message.summary_date,
+          message.recipient_phone ?? "-",
+          formatRole(message.delivery_status),
+          formatRole(message.trigger_type),
+        ])}
+      />
+    </section>
+  );
+}
+
 function TeamManagementPanel({
   users,
   assignments,
@@ -1746,6 +2103,99 @@ async function assignUserToProject(
         can_view_dashboard: form.canViewDashboard,
       }),
     },
+  );
+}
+
+async function loadDailySummaryWorkspace(
+  companyId: string,
+  projectId: string,
+  accessToken: string,
+  summaryDate: string,
+): Promise<{
+  setting: DailySummarySetting;
+  preview: DailySummaryPreview;
+  messages: DailySummaryMessage[];
+}> {
+  const [setting, preview, messages] = await Promise.all([
+    loadDailySummarySetting(companyId, projectId, accessToken),
+    previewDailySummary(companyId, projectId, accessToken, summaryDate),
+    loadDailySummaryMessages(companyId, projectId, accessToken),
+  ]);
+  return { setting, preview, messages };
+}
+
+async function loadDailySummarySetting(
+  companyId: string,
+  projectId: string,
+  accessToken: string,
+): Promise<DailySummarySetting> {
+  return apiRequest<DailySummarySetting>(
+    `/api/companies/${companyId}/projects/${projectId}/daily-summary/settings`,
+    accessToken,
+  );
+}
+
+async function updateDailySummarySetting(
+  companyId: string,
+  projectId: string,
+  accessToken: string,
+  form: typeof emptyDailySummaryForm,
+): Promise<DailySummarySetting> {
+  return apiRequest<DailySummarySetting>(
+    `/api/companies/${companyId}/projects/${projectId}/daily-summary/settings`,
+    accessToken,
+    {
+      method: "PUT",
+      body: JSON.stringify({
+        enabled: form.enabled,
+        send_time_local: normalizeTimeForApi(form.sendTimeLocal),
+        timezone: form.timezone.trim() || "Asia/Kolkata",
+        recipient_scope: form.recipientScope,
+      }),
+    },
+  );
+}
+
+async function previewDailySummary(
+  companyId: string,
+  projectId: string,
+  accessToken: string,
+  summaryDate: string,
+): Promise<DailySummaryPreview> {
+  const params = summaryDate ? `?summary_date=${encodeURIComponent(summaryDate)}` : "";
+  return apiRequest<DailySummaryPreview>(
+    `/api/companies/${companyId}/projects/${projectId}/daily-summary/preview${params}`,
+    accessToken,
+  );
+}
+
+async function sendDailySummaryNow(
+  companyId: string,
+  projectId: string,
+  accessToken: string,
+  summaryDate: string,
+): Promise<DailySummarySendResult> {
+  return apiRequest<DailySummarySendResult>(
+    `/api/companies/${companyId}/projects/${projectId}/daily-summary/send-now`,
+    accessToken,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        summary_date: summaryDate || null,
+        trigger_type: "manual_dashboard",
+      }),
+    },
+  );
+}
+
+async function loadDailySummaryMessages(
+  companyId: string,
+  projectId: string,
+  accessToken: string,
+): Promise<DailySummaryMessage[]> {
+  return apiRequest<DailySummaryMessage[]>(
+    `/api/companies/${companyId}/projects/${projectId}/daily-summary/messages`,
+    accessToken,
   );
 }
 
@@ -2436,6 +2886,23 @@ function formatDateRange(fromDate: string, toDate: string): string {
 
 function formatDateTime(value: string): string {
   return new Date(value).toLocaleString();
+}
+
+function formatTime(value: string): string {
+  return value.slice(0, 5);
+}
+
+function normalizeTimeForApi(value: string): string {
+  return value.length === 5 ? `${value}:00` : value;
+}
+
+function formFromDailySummarySetting(setting: DailySummarySetting): typeof emptyDailySummaryForm {
+  return {
+    enabled: setting.enabled,
+    sendTimeLocal: formatTime(setting.send_time_local),
+    timezone: setting.timezone,
+    recipientScope: setting.recipient_scope,
+  };
 }
 
 function formatProjectSchedule(project: Project | undefined): string {
