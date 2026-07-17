@@ -296,6 +296,45 @@ Conversation states show what the assistant would do next:
 - `awaiting_missing_information`: the assistant needs missing details
 - `redirected`: the message was irrelevant/offensive and should be handled professionally
 
+## Reporting record API examples
+
+Create a progress entry:
+
+```bash
+curl -X POST http://localhost:8000/companies/<company_id>/projects/<project_id>/reporting/progress-entries \
+  -H "Content-Type: application/json" \
+  -H "X-Platform-Admin-Token: local-dev-platform-admin-token" \
+  -d "{\"activity_name\":\"Plastering\",\"quantity\":50,\"unit_symbol\":\"sqm\",\"location_text\":\"Tower A Floor 2\",\"work_date\":\"2026-07-17\",\"status\":\"confirmed\"}"
+```
+
+Create a manpower entry:
+
+```bash
+curl -X POST http://localhost:8000/companies/<company_id>/projects/<project_id>/reporting/manpower-entries \
+  -H "Content-Type: application/json" \
+  -H "X-Platform-Admin-Token: local-dev-platform-admin-token" \
+  -d "{\"trade_name\":\"mason\",\"worker_count\":10,\"location_text\":\"Tower A\",\"work_date\":\"2026-07-17\",\"status\":\"confirmed\"}"
+```
+
+Create a material transaction:
+
+```bash
+curl -X POST http://localhost:8000/companies/<company_id>/projects/<project_id>/reporting/material-transactions \
+  -H "Content-Type: application/json" \
+  -H "X-Platform-Admin-Token: local-dev-platform-admin-token" \
+  -d "{\"transaction_type\":\"received\",\"material_name\":\"cement\",\"quantity\":100,\"unit_symbol\":\"bags\",\"transaction_date\":\"2026-07-17\",\"proof_status\":\"not_attached\"}"
+```
+
+List records:
+
+```bash
+curl http://localhost:8000/companies/<company_id>/projects/<project_id>/reporting/progress-entries \
+  -H "X-Platform-Admin-Token: local-dev-platform-admin-token"
+```
+
+The reporting APIs are still foundation APIs.
+They are not yet connected to the assistant confirmation reply or dashboard charts.
+
 ## Database migrations
 
 Migrations run automatically when the backend container starts.

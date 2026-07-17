@@ -134,6 +134,7 @@ Acceptance criteria:
 - material_stock_balances table exists
 - media_files table exists
 - records include company, project, user, date, original message, and status
+- foundation APIs exist to create and list these records during development
 
 Dependencies:
 

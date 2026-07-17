@@ -56,6 +56,7 @@ The first foundation APIs allow platform-admin setup of:
 - inbound WhatsApp message audit storage
 - first assistant parser result storage
 - assistant conversation state storage for confirmation or missing-information follow-up
+- reporting record storage for progress, manpower, material transactions, stock balances, and media/proof files
 
 During local development, these APIs require:
 
@@ -110,7 +111,21 @@ Current parser behavior:
 This is a rule-based foundation. External AI model calls will be added later.
 
 The assistant does not yet save final progress, manpower, or material records.
-That will be added after the construction reporting tables exist.
+The construction reporting tables now exist; the next step is to connect confirmed assistant conversations to these tables.
+
+## Reporting record tables
+
+The backend now has foundation tables and admin APIs for:
+
+- `progress_entries`: confirmed work completed on site
+- `manpower_entries`: workers by trade/category, date, and project area
+- `material_transactions`: material received and material issued
+- `material_stock_balances`: current material stock by project and material
+- `media_files`: photos, voice notes, and proof files linked to a project or future record
+
+These tables are intentionally separate from raw WhatsApp messages.
+Raw messages preserve what the user sent.
+Reporting records store the cleaned business data that dashboards, analytics, and exports will use.
 
 Important user-identification rule:
 
