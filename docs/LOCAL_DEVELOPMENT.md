@@ -367,6 +367,16 @@ Supported simple confirmation replies include:
 
 If the user belongs to multiple possible projects, the system will not guess.
 It marks the conversation as needing project selection.
+The next message from the same user can be the project name or project code, for example:
+
+```bash
+curl -X POST http://localhost:8000/webhooks/whatsapp/generic \
+  -H "Content-Type: application/json" \
+  -d "{\"message_id\":\"project-select-001\",\"phone\":\"+919999999999\",\"message_text\":\"GR-001\",\"provider_account_id\":\"local-test-account\"}"
+```
+
+If the project matches one active project available to that user, the pending update is saved.
+If it matches none or more than one, the system keeps waiting for a clearer project selection.
 
 The save step also checks project permissions:
 

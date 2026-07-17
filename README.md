@@ -58,6 +58,7 @@ Current foundation includes:
 - assistant confirmation/missing-information conversation state foundation
 - reporting record tables for progress, manpower, materials, stock balances, and media/proof files
 - first assistant confirmed-save workflow for WhatsApp replies like “Yes”, “OK”, or “haan”
+- project-selection follow-up when a WhatsApp user belongs to multiple active projects
 
 ## Planned architecture
 

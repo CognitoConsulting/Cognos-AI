@@ -70,10 +70,7 @@ def save_latest_confirmed_update(
     if not project:
         pending_state.status = "awaiting_project_selection"
         pending_state.missing_fields = ["project"]
-        pending_state.confirmation_prompt = (
-            "I can save this update, but I need to know which project it belongs to. "
-            "Please send the project name or project code."
-        )
+        pending_state.confirmation_prompt = _build_project_selection_prompt(db, user)
         db.commit()
         return ConfirmationSaveResult(
             handled=True,
@@ -81,6 +78,58 @@ def save_latest_confirmed_update(
             detail="Confirmation received, but project selection is required before saving.",
         )
 
+    return _save_pending_state_to_project(db, user, pending_state, project)
+
+
+def save_project_selection_reply(
+    db: Session,
+    user: User,
+    project_selection_text: str | None,
+) -> ConfirmationSaveResult:
+    pending_state = _find_latest_project_selection_state(db, user)
+    if not pending_state:
+        return ConfirmationSaveResult(
+            handled=False,
+            processing_status="no_pending_project_selection",
+            detail="No pending project selection was found for this user.",
+        )
+
+    pending_state.last_user_message = project_selection_text
+    pending_state.updated_at = datetime.utcnow()
+
+    match_result = _match_project_from_text(db, user, project_selection_text)
+    if match_result.status == "no_match":
+        pending_state.confirmation_prompt = (
+            "I could not match that to one of your active projects. "
+            "Please send the project name or project code."
+        )
+        db.commit()
+        return ConfirmationSaveResult(
+            handled=True,
+            processing_status="awaiting_project_selection",
+            detail="Project selection was not recognized.",
+        )
+
+    if match_result.status == "ambiguous":
+        pending_state.confirmation_prompt = (
+            "I found more than one matching project. Please send the exact project code."
+        )
+        db.commit()
+        return ConfirmationSaveResult(
+            handled=True,
+            processing_status="awaiting_project_selection",
+            detail="Project selection matched more than one project.",
+        )
+
+    return _save_pending_state_to_project(db, user, pending_state, match_result.project)
+
+
+def _save_pending_state_to_project(
+    db: Session,
+    user: User,
+    pending_state: AssistantConversationState,
+    project: Project,
+) -> ConfirmationSaveResult:
     if not _user_can_save_intent(db, user, project, pending_state.pending_intent):
         pending_state.status = "permission_denied"
         pending_state.confirmation_prompt = (
@@ -123,8 +172,38 @@ def _find_latest_pending_confirmation(
     )
 
 
+def _find_latest_project_selection_state(
+    db: Session,
+    user: User,
+) -> AssistantConversationState | None:
+    return db.scalar(
+        select(AssistantConversationState)
+        .where(AssistantConversationState.company_id == user.company_id)
+        .where(AssistantConversationState.user_id == user.id)
+        .where(AssistantConversationState.status == "awaiting_project_selection")
+        .order_by(AssistantConversationState.updated_at.desc())
+    )
+
+
 def _resolve_single_project_for_user(db: Session, user: User) -> Project | None:
-    assigned_projects = list(
+    available_projects = _projects_available_to_user(db, user)
+    if len(available_projects) == 1:
+        return available_projects[0]
+    return None
+
+
+def _projects_available_to_user(db: Session, user: User) -> list[Project]:
+    if user.role in {"owner", "admin", "company_admin"}:
+        return list(
+            db.scalars(
+                select(Project)
+                .where(Project.company_id == user.company_id)
+                .where(Project.status == "active")
+                .order_by(Project.created_at.desc())
+            ).all()
+        )
+
+    return list(
         db.scalars(
             select(Project)
             .join(ProjectUser, ProjectUser.project_id == Project.id)
@@ -135,24 +214,73 @@ def _resolve_single_project_for_user(db: Session, user: User) -> Project | None:
         ).all()
     )
 
-    if len(assigned_projects) == 1:
-        return assigned_projects[0]
-    if len(assigned_projects) > 1:
-        return None
 
-    if user.role in {"owner", "admin", "company_admin"}:
-        company_projects = list(
-            db.scalars(
-                select(Project)
-                .where(Project.company_id == user.company_id)
-                .where(Project.status == "active")
-                .order_by(Project.created_at.desc())
-            ).all()
+@dataclass(frozen=True)
+class ProjectMatchResult:
+    status: str
+    project: Project | None = None
+
+
+def _match_project_from_text(
+    db: Session,
+    user: User,
+    project_selection_text: str | None,
+) -> ProjectMatchResult:
+    text = _normalize_project_text(project_selection_text)
+    if not text:
+        return ProjectMatchResult(status="no_match")
+
+    projects = _projects_available_to_user(db, user)
+    exact_matches = [
+        project
+        for project in projects
+        if text in {_normalize_project_text(project.code), _normalize_project_text(project.name)}
+    ]
+    if len(exact_matches) == 1:
+        return ProjectMatchResult(status="matched", project=exact_matches[0])
+    if len(exact_matches) > 1:
+        return ProjectMatchResult(status="ambiguous")
+
+    partial_matches = [
+        project
+        for project in projects
+        if _project_text_matches(text, project.name) or _project_text_matches(text, project.code)
+    ]
+    if len(partial_matches) == 1:
+        return ProjectMatchResult(status="matched", project=partial_matches[0])
+    if len(partial_matches) > 1:
+        return ProjectMatchResult(status="ambiguous")
+
+    return ProjectMatchResult(status="no_match")
+
+
+def _project_text_matches(text: str, candidate: str | None) -> bool:
+    candidate_text = _normalize_project_text(candidate)
+    return bool(candidate_text and (text in candidate_text or candidate_text in text))
+
+
+def _normalize_project_text(value: str | None) -> str:
+    return " ".join((value or "").strip().lower().replace("-", " ").split())
+
+
+def _build_project_selection_prompt(db: Session, user: User) -> str:
+    projects = _projects_available_to_user(db, user)
+    if not projects:
+        return (
+            "I can save this update, but I could not find an active project for your user. "
+            "Please ask your company admin to assign you to a project."
         )
-        if len(company_projects) == 1:
-            return company_projects[0]
 
-    return None
+    project_options = []
+    for project in projects[:6]:
+        label = project.code if project.code else project.name
+        project_options.append(f"{project.name} ({label})")
+
+    option_text = "; ".join(project_options)
+    return (
+        "I can save this update, but I need to know which project it belongs to. "
+        f"Please reply with the project name or code. Available projects: {option_text}."
+    )
 
 
 def _user_can_save_intent(
