@@ -542,7 +542,10 @@ Current foundation behavior:
 - logs one `daily_summary_messages` row per recipient
 - logs the underlying outbound WhatsApp message through the provider-neutral outbound foundation
 - simulates delivery for `generic` and `test` providers
-- does not include the automatic 7:00 PM scheduler yet
+- includes an automatic in-app scheduler when `DAILY_SUMMARY_SCHEDULER_ENABLED=true`
+- checks due summaries every `DAILY_SUMMARY_SCHEDULER_INTERVAL_SECONDS`
+- creates default 7:00 PM local settings for active projects that do not have settings yet
+- avoids sending the same project summary more than once for the same local project date
 
 ## Database migrations
 
