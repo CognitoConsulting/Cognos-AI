@@ -66,6 +66,7 @@ Current foundation includes:
 - role-aware API access for company, project, reporting, knowledgebase, and WhatsApp admin routes
 - role-aware dashboard navigation, reporting sections, and exports
 - first dashboard team-management UI for adding users and assigning them to projects
+- first dashboard project-management UI for creating projects and reviewing project setup
 
 ## Planned architecture
 

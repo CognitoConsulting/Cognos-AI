@@ -71,12 +71,14 @@ This is still a development dashboard. The backend enforces role-aware API acces
 
 Owner/admin users can also use the first team-management panel to:
 
+- create projects
+- view selected-project setup details
 - view company users
 - create company users
 - view selected-project assignments
 - assign users to the selected project with progress, manpower, material, and dashboard permissions
 
-Editing users, deactivating users, and removing project assignments are not implemented yet.
+Editing projects, archiving projects, editing users, deactivating users, and removing project assignments are not implemented yet.
 
 ## Seed demo data
 

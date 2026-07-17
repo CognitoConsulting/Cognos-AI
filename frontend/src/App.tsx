@@ -14,7 +14,12 @@ type Project = {
   company_id: string;
   name: string;
   code: string | null;
+  location: string | null;
   status: string;
+  start_date: string | null;
+  end_date: string | null;
+  timezone: string;
+  created_at: string;
 };
 
 type CompanyUser = {
@@ -186,6 +191,16 @@ const emptyNewUserForm = {
   role: "site_engineer",
 };
 
+const emptyNewProjectForm = {
+  name: "",
+  code: "",
+  location: "",
+  status: "active",
+  startDate: "",
+  endDate: "",
+  timezone: "Asia/Kolkata",
+};
+
 function defaultAssignmentForm() {
   return {
     userId: "",
@@ -213,10 +228,13 @@ export function App() {
   const [reportingData, setReportingData] = useState<ReportingData>(emptyReportingData);
   const [companyUsers, setCompanyUsers] = useState<CompanyUser[]>([]);
   const [projectAssignments, setProjectAssignments] = useState<ProjectAssignment[]>([]);
+  const [newProjectForm, setNewProjectForm] = useState(emptyNewProjectForm);
   const [newUserForm, setNewUserForm] = useState(emptyNewUserForm);
   const [assignmentForm, setAssignmentForm] = useState(defaultAssignmentForm);
   const [loadingMessage, setLoadingMessage] = useState("Loading companies...");
   const [errorMessage, setErrorMessage] = useState("");
+  const [projectMessage, setProjectMessage] = useState("");
+  const [projectErrorMessage, setProjectErrorMessage] = useState("");
   const [teamMessage, setTeamMessage] = useState("");
   const [teamErrorMessage, setTeamErrorMessage] = useState("");
 
@@ -336,6 +354,7 @@ export function App() {
   const selectedCompany = companies.find((company) => company.id === selectedCompanyId);
   const selectedProject = projects.find((project) => project.id === selectedProjectId);
   const canManageTeam = currentUser ? isCompanyAdmin(currentUser.role) : false;
+  const canManageProjects = currentUser ? isCompanyAdmin(currentUser.role) : false;
   const visibleModules = useMemo(
     () => buildVisibleModules(currentUser, reportingData),
     [currentUser, reportingData],
@@ -361,6 +380,29 @@ export function App() {
     } catch (error) {
       setLoadingMessage("");
       setErrorMessage(error instanceof Error ? error.message : "Login failed.");
+    }
+  }
+
+  async function handleCreateProject(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selectedCompanyId) {
+      return;
+    }
+
+    setProjectMessage("");
+    setProjectErrorMessage("");
+    try {
+      const createdProject = await createCompanyProject(
+        selectedCompanyId,
+        accessToken,
+        newProjectForm,
+      );
+      setProjects((existingProjects) => [createdProject, ...existingProjects]);
+      setSelectedProjectId(createdProject.id);
+      setNewProjectForm(emptyNewProjectForm);
+      setProjectMessage(`Created project ${createdProject.name}.`);
+    } catch (error) {
+      setProjectErrorMessage(error instanceof Error ? error.message : "Could not create project.");
     }
   }
 
@@ -540,6 +582,18 @@ export function App() {
 
         {loadingMessage ? <p className="status-message">{loadingMessage}</p> : null}
         {errorMessage ? <p className="error-message">{errorMessage}</p> : null}
+
+        {canManageProjects ? (
+          <ProjectManagementPanel
+            projects={projects}
+            selectedProject={selectedProject}
+            newProjectForm={newProjectForm}
+            projectMessage={projectMessage}
+            projectErrorMessage={projectErrorMessage}
+            onNewProjectFormChange={setNewProjectForm}
+            onCreateProject={handleCreateProject}
+          />
+        ) : null}
 
         {canManageTeam ? (
           <TeamManagementPanel
@@ -829,6 +883,175 @@ function RestrictedPanel({ title, message }: { title: string; message: string })
   );
 }
 
+function ProjectManagementPanel({
+  projects,
+  selectedProject,
+  newProjectForm,
+  projectMessage,
+  projectErrorMessage,
+  onNewProjectFormChange,
+  onCreateProject,
+}: {
+  projects: Project[];
+  selectedProject: Project | undefined;
+  newProjectForm: typeof emptyNewProjectForm;
+  projectMessage: string;
+  projectErrorMessage: string;
+  onNewProjectFormChange: (form: typeof emptyNewProjectForm) => void;
+  onCreateProject: (event: FormEvent<HTMLFormElement>) => void;
+}) {
+  return (
+    <section className="management-section" id="projects">
+      <div className="section-heading">
+        <p className="eyebrow">Project management</p>
+        <h3>Create projects and review project setup</h3>
+        <p>
+          Owner/admin users can create company projects from the dashboard. Project edit and
+          archive actions are planned later.
+        </p>
+      </div>
+
+      {projectMessage ? <p className="status-message">{projectMessage}</p> : null}
+      {projectErrorMessage ? <p className="error-message">{projectErrorMessage}</p> : null}
+
+      <section className="dashboard-grid">
+        <article className="panel">
+          <h3>Add project</h3>
+          <form className="stacked-form" onSubmit={onCreateProject}>
+            <label>
+              Project name
+              <input
+                value={newProjectForm.name}
+                onChange={(event) =>
+                  onNewProjectFormChange({ ...newProjectForm, name: event.target.value })
+                }
+                placeholder="Green Residency"
+                required
+              />
+            </label>
+            <label>
+              Project code
+              <input
+                value={newProjectForm.code}
+                onChange={(event) =>
+                  onNewProjectFormChange({ ...newProjectForm, code: event.target.value })
+                }
+                placeholder="GR-001"
+              />
+            </label>
+            <label>
+              Location
+              <input
+                value={newProjectForm.location}
+                onChange={(event) =>
+                  onNewProjectFormChange({ ...newProjectForm, location: event.target.value })
+                }
+                placeholder="Pune"
+              />
+            </label>
+            <div className="date-row">
+              <label>
+                Start date
+                <input
+                  type="date"
+                  value={newProjectForm.startDate}
+                  onChange={(event) =>
+                    onNewProjectFormChange({
+                      ...newProjectForm,
+                      startDate: event.target.value,
+                    })
+                  }
+                />
+              </label>
+              <label>
+                End date
+                <input
+                  type="date"
+                  value={newProjectForm.endDate}
+                  onChange={(event) =>
+                    onNewProjectFormChange({
+                      ...newProjectForm,
+                      endDate: event.target.value,
+                    })
+                  }
+                />
+              </label>
+            </div>
+            <label>
+              Timezone
+              <input
+                value={newProjectForm.timezone}
+                onChange={(event) =>
+                  onNewProjectFormChange({ ...newProjectForm, timezone: event.target.value })
+                }
+                placeholder="Asia/Kolkata"
+                required
+              />
+            </label>
+            <label>
+              Status
+              <select
+                value={newProjectForm.status}
+                onChange={(event) =>
+                  onNewProjectFormChange({ ...newProjectForm, status: event.target.value })
+                }
+              >
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+                <option value="completed">Completed</option>
+              </select>
+            </label>
+            <button type="submit">Create project</button>
+          </form>
+        </article>
+
+        <article className="panel">
+          <h3>Selected project</h3>
+          <dl className="details-list">
+            <div>
+              <dt>Name</dt>
+              <dd>{selectedProject?.name ?? "Not selected"}</dd>
+            </div>
+            <div>
+              <dt>Code</dt>
+              <dd>{selectedProject?.code ?? "-"}</dd>
+            </div>
+            <div>
+              <dt>Location</dt>
+              <dd>{selectedProject?.location ?? "-"}</dd>
+            </div>
+            <div>
+              <dt>Schedule</dt>
+              <dd>{formatProjectSchedule(selectedProject)}</dd>
+            </div>
+            <div>
+              <dt>Timezone</dt>
+              <dd>{selectedProject?.timezone ?? "-"}</dd>
+            </div>
+            <div>
+              <dt>Status</dt>
+              <dd>{selectedProject ? formatRole(selectedProject.status) : "-"}</dd>
+            </div>
+          </dl>
+        </article>
+      </section>
+
+      <ReportingTable
+        title="Company projects"
+        emptyMessage="No projects have been created yet."
+        columns={["Name", "Code", "Location", "Schedule", "Status"]}
+        rows={projects.map((project) => [
+          project.name,
+          project.code ?? "-",
+          project.location ?? "-",
+          formatProjectSchedule(project),
+          formatRole(project.status),
+        ])}
+      />
+    </section>
+  );
+}
+
 function TeamManagementPanel({
   users,
   assignments,
@@ -1104,6 +1327,25 @@ async function loadCompanies(accessToken: string): Promise<Company[]> {
 
 async function loadProjects(companyId: string, accessToken: string): Promise<Project[]> {
   return apiRequest<Project[]>(`/api/companies/${companyId}/projects`, accessToken);
+}
+
+async function createCompanyProject(
+  companyId: string,
+  accessToken: string,
+  form: typeof emptyNewProjectForm,
+): Promise<Project> {
+  return apiRequest<Project>(`/api/companies/${companyId}/projects`, accessToken, {
+    method: "POST",
+    body: JSON.stringify({
+      name: form.name.trim(),
+      code: form.code.trim() || null,
+      location: form.location.trim() || null,
+      status: form.status,
+      start_date: form.startDate || null,
+      end_date: form.endDate || null,
+      timezone: form.timezone.trim() || "Asia/Kolkata",
+    }),
+  });
 }
 
 async function loadCompanyUsers(companyId: string, accessToken: string): Promise<CompanyUser[]> {
@@ -1471,6 +1713,22 @@ function formatDateRange(fromDate: string, toDate: string): string {
 
 function formatDateTime(value: string): string {
   return new Date(value).toLocaleString();
+}
+
+function formatProjectSchedule(project: Project | undefined): string {
+  if (!project) {
+    return "-";
+  }
+  if (project.start_date && project.end_date) {
+    return `${project.start_date} to ${project.end_date}`;
+  }
+  if (project.start_date) {
+    return `From ${project.start_date}`;
+  }
+  if (project.end_date) {
+    return `Until ${project.end_date}`;
+  }
+  return "Not set";
 }
 
 function buildVisibleModules(

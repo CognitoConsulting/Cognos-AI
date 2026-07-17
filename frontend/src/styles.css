@@ -276,6 +276,7 @@ a {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.management-section,
 .team-section {
   display: grid;
   gap: 16px;
