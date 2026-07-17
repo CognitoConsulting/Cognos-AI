@@ -45,6 +45,29 @@ type ProjectAssignment = {
   created_at: string;
 };
 
+type ProjectKnowledgeUpload = {
+  id: string;
+  company_id: string;
+  project_id: string;
+  uploaded_by: string | null;
+  upload_type: string;
+  file_name: string;
+  storage_url: string | null;
+  status: string;
+  error_summary: string | null;
+  uploaded_at: string;
+};
+
+type KnowledgeTemplateImportResult = {
+  upload_id: string;
+  upload_type: string;
+  status: string;
+  imported_count: number;
+  skipped_count: number;
+  error_count: number;
+  errors: string[];
+};
+
 type AuthenticatedUser = {
   id: string;
   company_id: string;
@@ -174,6 +197,14 @@ const roleOptions = [
   { value: "storekeeper", label: "Storekeeper" },
 ];
 
+const knowledgeTemplateOptions = [
+  { value: "units", label: "Units" },
+  { value: "activities", label: "Activities" },
+  { value: "locations", label: "Areas / sub-areas" },
+  { value: "boq", label: "BOQ / material list" },
+  { value: "schedule", label: "Schedule" },
+];
+
 const emptyReportingData: ReportingData = {
   progress: [],
   manpower: [],
@@ -228,15 +259,20 @@ export function App() {
   const [reportingData, setReportingData] = useState<ReportingData>(emptyReportingData);
   const [companyUsers, setCompanyUsers] = useState<CompanyUser[]>([]);
   const [projectAssignments, setProjectAssignments] = useState<ProjectAssignment[]>([]);
+  const [knowledgeUploads, setKnowledgeUploads] = useState<ProjectKnowledgeUpload[]>([]);
   const [newProjectForm, setNewProjectForm] = useState(emptyNewProjectForm);
   const [newUserForm, setNewUserForm] = useState(emptyNewUserForm);
   const [assignmentForm, setAssignmentForm] = useState(defaultAssignmentForm);
+  const [knowledgeTemplateType, setKnowledgeTemplateType] = useState("boq");
+  const [knowledgeFile, setKnowledgeFile] = useState<File | null>(null);
   const [loadingMessage, setLoadingMessage] = useState("Loading companies...");
   const [errorMessage, setErrorMessage] = useState("");
   const [projectMessage, setProjectMessage] = useState("");
   const [projectErrorMessage, setProjectErrorMessage] = useState("");
   const [teamMessage, setTeamMessage] = useState("");
   const [teamErrorMessage, setTeamErrorMessage] = useState("");
+  const [knowledgeMessage, setKnowledgeMessage] = useState("");
+  const [knowledgeErrorMessage, setKnowledgeErrorMessage] = useState("");
 
   useEffect(() => {
     if (!accessToken) {
@@ -344,6 +380,23 @@ export function App() {
       });
   }, [selectedCompanyId, selectedProjectId, currentUser, accessToken]);
 
+  useEffect(() => {
+    if (!selectedCompanyId || !selectedProjectId || !currentUser || !isCompanyAdmin(currentUser.role)) {
+      setKnowledgeUploads([]);
+      return;
+    }
+
+    loadKnowledgeUploads(selectedCompanyId, selectedProjectId, accessToken)
+      .then((uploads) => {
+        setKnowledgeUploads(uploads);
+        setKnowledgeErrorMessage("");
+      })
+      .catch((error: Error) => {
+        setKnowledgeUploads([]);
+        setKnowledgeErrorMessage(error.message);
+      });
+  }, [selectedCompanyId, selectedProjectId, currentUser, accessToken]);
+
   const filteredData = useMemo(
     () => filterReportingData(reportingData, fromDate, toDate),
     [reportingData, fromDate, toDate],
@@ -355,6 +408,7 @@ export function App() {
   const selectedProject = projects.find((project) => project.id === selectedProjectId);
   const canManageTeam = currentUser ? isCompanyAdmin(currentUser.role) : false;
   const canManageProjects = currentUser ? isCompanyAdmin(currentUser.role) : false;
+  const canManageKnowledgebase = currentUser ? isCompanyAdmin(currentUser.role) : false;
   const visibleModules = useMemo(
     () => buildVisibleModules(currentUser, reportingData),
     [currentUser, reportingData],
@@ -444,6 +498,56 @@ export function App() {
       setTeamMessage("User assigned to the selected project.");
     } catch (error) {
       setTeamErrorMessage(error instanceof Error ? error.message : "Could not assign user.");
+    }
+  }
+
+  async function handleDownloadKnowledgeTemplate(templateType: string) {
+    if (!selectedCompanyId) {
+      return;
+    }
+
+    setKnowledgeMessage("");
+    setKnowledgeErrorMessage("");
+    try {
+      await downloadKnowledgeTemplate(selectedCompanyId, accessToken, templateType);
+      setKnowledgeMessage(`Downloaded ${templateLabel(templateType)} template.`);
+    } catch (error) {
+      setKnowledgeErrorMessage(
+        error instanceof Error ? error.message : "Could not download template.",
+      );
+    }
+  }
+
+  async function handleImportKnowledgeTemplate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selectedCompanyId || !selectedProjectId || !knowledgeFile) {
+      return;
+    }
+
+    setKnowledgeMessage("");
+    setKnowledgeErrorMessage("");
+    try {
+      const result = await importKnowledgeTemplate(
+        selectedCompanyId,
+        selectedProjectId,
+        accessToken,
+        knowledgeTemplateType,
+        knowledgeFile,
+        currentUser?.id,
+      );
+      const uploads = await loadKnowledgeUploads(selectedCompanyId, selectedProjectId, accessToken);
+      setKnowledgeUploads(uploads);
+      setKnowledgeFile(null);
+      setKnowledgeMessage(
+        `Imported ${result.imported_count} row(s), skipped ${result.skipped_count}, errors ${result.error_count}.`,
+      );
+      if (result.errors.length > 0) {
+        setKnowledgeErrorMessage(result.errors.slice(0, 3).join(" "));
+      }
+    } catch (error) {
+      setKnowledgeErrorMessage(
+        error instanceof Error ? error.message : "Could not import template.",
+      );
     }
   }
 
@@ -608,6 +712,21 @@ export function App() {
             onAssignmentFormChange={setAssignmentForm}
             onCreateUser={handleCreateUser}
             onAssignUser={handleAssignUser}
+          />
+        ) : null}
+
+        {canManageKnowledgebase ? (
+          <KnowledgebaseManagementPanel
+            uploads={knowledgeUploads}
+            selectedProject={selectedProject}
+            templateType={knowledgeTemplateType}
+            selectedFile={knowledgeFile}
+            knowledgeMessage={knowledgeMessage}
+            knowledgeErrorMessage={knowledgeErrorMessage}
+            onTemplateTypeChange={setKnowledgeTemplateType}
+            onFileChange={setKnowledgeFile}
+            onDownloadTemplate={handleDownloadKnowledgeTemplate}
+            onImportTemplate={handleImportKnowledgeTemplate}
           />
         ) : null}
 
@@ -1052,6 +1171,113 @@ function ProjectManagementPanel({
   );
 }
 
+function KnowledgebaseManagementPanel({
+  uploads,
+  selectedProject,
+  templateType,
+  selectedFile,
+  knowledgeMessage,
+  knowledgeErrorMessage,
+  onTemplateTypeChange,
+  onFileChange,
+  onDownloadTemplate,
+  onImportTemplate,
+}: {
+  uploads: ProjectKnowledgeUpload[];
+  selectedProject: Project | undefined;
+  templateType: string;
+  selectedFile: File | null;
+  knowledgeMessage: string;
+  knowledgeErrorMessage: string;
+  onTemplateTypeChange: (templateType: string) => void;
+  onFileChange: (file: File | null) => void;
+  onDownloadTemplate: (templateType: string) => void;
+  onImportTemplate: (event: FormEvent<HTMLFormElement>) => void;
+}) {
+  return (
+    <section className="management-section" id="knowledgebase">
+      <div className="section-heading">
+        <p className="eyebrow">Project knowledgebase</p>
+        <h3>Download templates and import project reference data</h3>
+        <p>
+          Upload project areas, activities, BOQ/materials, schedules, and units so the assistant can
+          validate WhatsApp entries against real project data.
+        </p>
+      </div>
+
+      {knowledgeMessage ? <p className="status-message">{knowledgeMessage}</p> : null}
+      {knowledgeErrorMessage ? <p className="error-message">{knowledgeErrorMessage}</p> : null}
+
+      <section className="dashboard-grid">
+        <article className="panel">
+          <h3>Download sample templates</h3>
+          <p>Download a template, fill it in Excel, then upload it back for the selected project.</p>
+          <div className="button-row">
+            {knowledgeTemplateOptions.map((option) => (
+              <button
+                type="button"
+                key={option.value}
+                onClick={() => onDownloadTemplate(option.value)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </article>
+
+        <article className="panel">
+          <h3>Import completed template</h3>
+          <p>
+            Selected project: <strong>{selectedProject?.name ?? "No project selected"}</strong>
+          </p>
+          <form className="stacked-form" onSubmit={onImportTemplate}>
+            <label>
+              Template type
+              <select
+                value={templateType}
+                onChange={(event) => onTemplateTypeChange(event.target.value)}
+              >
+                {knowledgeTemplateOptions.map((option) => (
+                  <option value={option.value} key={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Completed .xlsx file
+              <input
+                type="file"
+                accept=".xlsx"
+                onChange={(event) => onFileChange(event.target.files?.[0] ?? null)}
+              />
+            </label>
+            <p className="muted-note">
+              {selectedFile ? `Selected: ${selectedFile.name}` : "Only .xlsx files are supported."}
+            </p>
+            <button type="submit" disabled={!selectedProject || !selectedFile}>
+              Import template
+            </button>
+          </form>
+        </article>
+      </section>
+
+      <ReportingTable
+        title="Knowledgebase upload history"
+        emptyMessage="No knowledgebase templates have been uploaded for this project yet."
+        columns={["Uploaded", "Type", "File", "Status", "Errors"]}
+        rows={uploads.map((upload) => [
+          formatDateTime(upload.uploaded_at),
+          templateLabel(upload.upload_type),
+          upload.file_name,
+          formatRole(upload.status),
+          upload.error_summary ?? "-",
+        ])}
+      />
+    </section>
+  );
+}
+
 function TeamManagementPanel({
   users,
   assignments,
@@ -1346,6 +1572,74 @@ async function createCompanyProject(
       timezone: form.timezone.trim() || "Asia/Kolkata",
     }),
   });
+}
+
+async function loadKnowledgeUploads(
+  companyId: string,
+  projectId: string,
+  accessToken: string,
+): Promise<ProjectKnowledgeUpload[]> {
+  return apiRequest<ProjectKnowledgeUpload[]>(
+    `/api/companies/${companyId}/projects/${projectId}/knowledge-uploads`,
+    accessToken,
+  );
+}
+
+async function downloadKnowledgeTemplate(
+  companyId: string,
+  accessToken: string,
+  templateType: string,
+): Promise<void> {
+  const response = await fetch(`/api/companies/${companyId}/knowledgebase/templates/${templateType}`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new ApiRequestError(response.status, await errorDetail(response));
+  }
+
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${templateType}_template.xlsx`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+async function importKnowledgeTemplate(
+  companyId: string,
+  projectId: string,
+  accessToken: string,
+  uploadType: string,
+  file: File,
+  uploadedBy?: string,
+): Promise<KnowledgeTemplateImportResult> {
+  const formData = new FormData();
+  formData.append("upload_type", uploadType);
+  if (uploadedBy) {
+    formData.append("uploaded_by", uploadedBy);
+  }
+  formData.append("file", file);
+
+  const response = await fetch(
+    `/api/companies/${companyId}/projects/${projectId}/knowledge-uploads/import`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: formData,
+    },
+  );
+
+  if (!response.ok) {
+    throw new ApiRequestError(response.status, await errorDetail(response));
+  }
+
+  return response.json() as Promise<KnowledgeTemplateImportResult>;
 }
 
 async function loadCompanyUsers(companyId: string, accessToken: string): Promise<CompanyUser[]> {
@@ -1729,6 +2023,13 @@ function formatProjectSchedule(project: Project | undefined): string {
     return `Until ${project.end_date}`;
   }
   return "Not set";
+}
+
+function templateLabel(templateType: string): string {
+  return (
+    knowledgeTemplateOptions.find((option) => option.value === templateType)?.label ??
+    formatRole(templateType)
+  );
 }
 
 function buildVisibleModules(

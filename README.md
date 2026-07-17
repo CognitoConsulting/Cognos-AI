@@ -67,6 +67,7 @@ Current foundation includes:
 - role-aware dashboard navigation, reporting sections, and exports
 - first dashboard team-management UI for adding users and assigning them to projects
 - first dashboard project-management UI for creating projects and reviewing project setup
+- first dashboard project knowledgebase UI for template downloads, template imports, and upload history
 
 ## Planned architecture
 
