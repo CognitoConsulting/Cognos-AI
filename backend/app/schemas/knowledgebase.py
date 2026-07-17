@@ -137,3 +137,13 @@ class ProjectKnowledgeUploadRead(ORMBaseModel):
     status: str
     error_summary: str | None
     uploaded_at: datetime
+
+
+class KnowledgeTemplateImportResult(ORMBaseModel):
+    upload_id: UUID
+    upload_type: str
+    status: str
+    imported_count: int
+    skipped_count: int
+    error_count: int
+    errors: list[str]

@@ -1,9 +1,11 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+from io import BytesIO
 
 from app.api.deps import get_database_session, require_platform_admin
 from app.models import (
@@ -25,6 +27,7 @@ from app.schemas.knowledgebase import (
     ActivitySynonymRead,
     BOQItemCreate,
     BOQItemRead,
+    KnowledgeTemplateImportResult,
     ProjectKnowledgeUploadCreate,
     ProjectKnowledgeUploadRead,
     ProjectLocationCreate,
@@ -34,11 +37,74 @@ from app.schemas.knowledgebase import (
     UnitCreate,
     UnitRead,
 )
+from app.services.knowledgebase_templates import build_template_workbook, import_template
 
 router = APIRouter(
     prefix="/companies/{company_id}",
     dependencies=[Depends(require_platform_admin)],
 )
+
+
+@router.get("/knowledgebase/templates/{template_type}")
+def download_knowledgebase_template(
+    company_id: UUID,
+    template_type: str,
+    db: Session = Depends(get_database_session),
+) -> StreamingResponse:
+    _require_company(db, company_id)
+    try:
+        content = build_template_workbook(template_type)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+    normalized_name = template_type.strip().lower().replace("-", "_")
+    filename = f"{normalized_name}_template.xlsx"
+    return StreamingResponse(
+        BytesIO(content),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.post(
+    "/projects/{project_id}/knowledge-uploads/import",
+    response_model=KnowledgeTemplateImportResult,
+)
+async def import_knowledgebase_template(
+    company_id: UUID,
+    project_id: UUID,
+    upload_type: str = Form(...),
+    uploaded_by: UUID | None = Form(default=None),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_database_session),
+) -> KnowledgeTemplateImportResult:
+    if not file.filename or not file.filename.lower().endswith(".xlsx"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only .xlsx template files are supported.",
+        )
+
+    content = await file.read()
+    try:
+        result = import_template(
+            db=db,
+            company_id=company_id,
+            project_id=project_id,
+            upload_type=upload_type,
+            file_name=file.filename,
+            content=content,
+            uploaded_by=uploaded_by,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+    return KnowledgeTemplateImportResult.model_validate(result)
 
 
 @router.post("/units", response_model=UnitRead, status_code=status.HTTP_201_CREATED)
