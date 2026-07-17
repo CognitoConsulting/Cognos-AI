@@ -54,6 +54,7 @@ The first foundation APIs allow platform-admin setup of:
 - WhatsApp provider account setup
 - provider-neutral WhatsApp webhook intake
 - inbound WhatsApp message audit storage
+- first assistant parser result storage
 
 During local development, these APIs require:
 
@@ -87,4 +88,23 @@ Current supported intake formats:
 This does not yet send WhatsApp replies or run the AI assistant workflow.
 
 It normalizes inbound provider payloads and stores them in `whatsapp_messages`.
+
+The webhook also creates a first parser result in `assistant_parse_results`.
+
+Current parser behavior:
+
+- detects progress updates
+- detects manpower updates
+- detects material received
+- detects material issued
+- detects irrelevant/offensive messages
+- extracts basic quantity, unit, material, activity, trade counts, and location where possible
+- marks missing information for follow-up
+
+This is a rule-based foundation. External AI model calls will be added later.
+
+Important user-identification rule:
+
+- one WhatsApp phone number should map to one platform user
+- this keeps inbound WhatsApp message routing unambiguous
 

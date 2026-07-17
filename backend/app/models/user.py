@@ -10,6 +10,7 @@ from app.db.base import Base
 class User(Base):
     __tablename__ = "users"
     __table_args__ = (
+        UniqueConstraint("phone", name="uq_users_phone"),
         UniqueConstraint("company_id", "phone", name="uq_users_company_phone"),
         UniqueConstraint("company_id", "email", name="uq_users_company_email"),
     )

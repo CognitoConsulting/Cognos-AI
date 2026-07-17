@@ -416,6 +416,7 @@ Acceptance criteria:
 - parser detects image/proof relationship
 - parser extracts project, location, activity/material/trade, quantity, unit, and date where available
 - parser asks only for missing information
+- first parser output is stored separately from raw WhatsApp messages for audit and review
 
 Dependencies:
 

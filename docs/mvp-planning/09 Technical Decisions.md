@@ -193,3 +193,13 @@ Reason:
 Basic AI parsing is part of the product workflow.
 
 Advanced AI insights should be available only to AI subscribers.
+
+## Decision 16: WhatsApp phone numbers must uniquely identify users
+
+Reason:
+
+The assistant identifies inbound WhatsApp users by phone number.
+
+To avoid routing a site update to the wrong company or project, one WhatsApp phone number should map to one platform user.
+
+If a real person works across multiple companies later, that should be handled deliberately with cross-company membership rules, not accidental duplicate phone records.

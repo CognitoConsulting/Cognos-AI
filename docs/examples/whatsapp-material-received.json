@@ -1,0 +1,6 @@
+{
+  "message_id": "test-material-received-001",
+  "phone": "+919999999999",
+  "message_text": "100 cement bags received at Tower A",
+  "provider_account_id": "local-test-account"
+}
