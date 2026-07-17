@@ -60,6 +60,7 @@ Current foundation includes:
 - first assistant confirmed-save workflow for WhatsApp replies like “Yes”, “OK”, or “haan”
 - project-selection follow-up when a WhatsApp user belongs to multiple active projects
 - first live dashboard reporting views for saved progress, manpower, materials, stock, and media records
+- first project-manager analytics cards for progress by area, manpower distribution, stock highlights, and attention items
 
 ## Planned architecture
 

@@ -21,6 +21,7 @@ Current live dashboard foundation:
 - shows saved progress, manpower, material, stock, and media/proof records
 - supports date range filtering
 - includes summary cards
+- includes project-manager analytics cards for progress by area, manpower distribution, stock highlights, and attention items
 - includes CSV export buttons that Excel can open
 
 During local development, the frontend uses the temporary platform-admin token.

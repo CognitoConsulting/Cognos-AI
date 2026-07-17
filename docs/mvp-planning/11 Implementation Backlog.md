@@ -669,6 +669,7 @@ Acceptance criteria:
 - card for unmatched/needs-review entries
 - card for images uploaded today
 - first live dashboard view can load saved progress, manpower, material, stock, and media records
+- first project-manager analytics cards show progress by area, manpower distribution, material stock highlights, and attention items
 
 Dependencies:
 
