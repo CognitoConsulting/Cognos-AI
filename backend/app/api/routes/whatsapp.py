@@ -22,6 +22,7 @@ from app.models import (
 from app.schemas.assistant import AssistantConversationStateRead, AssistantParseResultRead
 from app.schemas.whatsapp import (
     WhatsAppMessageRead,
+    WhatsAppOutboundTextCreate,
     WhatsAppProviderAccountCreate,
     WhatsAppProviderAccountRead,
     WhatsAppWebhookAccepted,
@@ -33,7 +34,11 @@ from app.services.assistant_saver import (
     save_project_selection_reply,
 )
 from app.services.assistant_workflow import build_conversation_decision
-from app.services.whatsapp_provider import normalize_inbound_message
+from app.services.whatsapp_provider import (
+    find_provider_account_for_inbound,
+    normalize_inbound_message,
+    queue_outbound_text_message,
+)
 
 router = APIRouter()
 
@@ -50,7 +55,9 @@ def create_provider_account(
     db: Session = Depends(get_database_session),
 ) -> WhatsAppProviderAccount:
     require_company_admin_access(db, company_id, auth)
-    account = WhatsAppProviderAccount(company_id=company_id, **payload.model_dump())
+    account_data = payload.model_dump()
+    account_data["provider_name"] = account_data["provider_name"].strip().lower().replace("-", "_")
+    account = WhatsAppProviderAccount(company_id=company_id, **account_data)
     db.add(account)
     try:
         db.commit()
@@ -100,6 +107,34 @@ def list_whatsapp_messages(
             .order_by(WhatsAppMessage.received_at.desc())
         ).all()
     )
+
+
+@router.post(
+    "/companies/{company_id}/whatsapp/outbound-messages",
+    response_model=WhatsAppMessageRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_outbound_whatsapp_message(
+    company_id: UUID,
+    payload: WhatsAppOutboundTextCreate,
+    auth: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_database_session),
+) -> WhatsAppMessage:
+    require_company_admin_access(db, company_id, auth)
+    user = _require_company_user(db, company_id, payload.user_id) if payload.user_id else None
+    result = queue_outbound_text_message(
+        db=db,
+        company_id=company_id,
+        user_id=user.id if user else None,
+        to_phone=payload.to_phone,
+        message_text=payload.message_text,
+        provider_name=payload.provider_name,
+        provider_account_id=payload.provider_account_id,
+        reason=payload.reason,
+    )
+    db.commit()
+    db.refresh(result.message)
+    return result.message
 
 
 @router.get(
@@ -176,8 +211,19 @@ async def receive_whatsapp_webhook(
             detail="No inbound user message found in provider payload.",
         )
 
+    provider_account = find_provider_account_for_inbound(
+        db,
+        normalized.provider_name,
+        normalized.provider_account_id,
+    )
     user = _find_user_by_phone(db, normalized.phone)
-    company_id = user.company_id if user else None
+    company_id = (
+        user.company_id
+        if user
+        else provider_account.company_id
+        if provider_account
+        else None
+    )
     processing_status = "received" if user else "unknown_user"
 
     message = WhatsAppMessage(
@@ -214,39 +260,71 @@ async def receive_whatsapp_webhook(
 
     db.refresh(message)
 
-    if user:
-        project_selection_result = save_project_selection_reply(
+    if not user:
+        _queue_assistant_reply(
+            db,
+            message,
+            (
+                "This WhatsApp number is not registered for Cognos AI yet. "
+                "Please ask your company admin to add your user before sending site updates."
+            )
+            if message.company_id
+            else None,
+            reason="unknown_user",
+        )
+        db.commit()
+        db.refresh(message)
+        return WhatsAppWebhookAccepted(
+            status="accepted",
+            message_id=message.id,
+            processing_status=message.processing_status,
+            detail="Inbound WhatsApp message stored, but the user phone number is unknown.",
+        )
+
+    project_selection_result = save_project_selection_reply(
+        db=db,
+        user=user,
+        project_selection_text=message.message_text,
+    )
+    if project_selection_result.handled:
+        message.processing_status = project_selection_result.processing_status
+        _queue_assistant_reply(
+            db,
+            message,
+            project_selection_result.reply_text,
+            reason="assistant_project_selection",
+        )
+        db.commit()
+        db.refresh(message)
+        return WhatsAppWebhookAccepted(
+            status="accepted",
+            message_id=message.id,
+            processing_status=message.processing_status,
+            detail=project_selection_result.detail,
+        )
+
+    if is_affirmative_confirmation(message.message_text):
+        save_result = save_latest_confirmed_update(
             db=db,
             user=user,
-            project_selection_text=message.message_text,
+            confirmation_message_text=message.message_text,
         )
-        if project_selection_result.handled:
-            message.processing_status = project_selection_result.processing_status
+        if save_result.handled:
+            message.processing_status = save_result.processing_status
+            _queue_assistant_reply(
+                db,
+                message,
+                save_result.reply_text,
+                reason="assistant_confirmation",
+            )
             db.commit()
             db.refresh(message)
             return WhatsAppWebhookAccepted(
                 status="accepted",
                 message_id=message.id,
                 processing_status=message.processing_status,
-                detail=project_selection_result.detail,
+                detail=save_result.detail,
             )
-
-        if is_affirmative_confirmation(message.message_text):
-            save_result = save_latest_confirmed_update(
-                db=db,
-                user=user,
-                confirmation_message_text=message.message_text,
-            )
-            if save_result.handled:
-                message.processing_status = save_result.processing_status
-                db.commit()
-                db.refresh(message)
-                return WhatsAppWebhookAccepted(
-                    status="accepted",
-                    message_id=message.id,
-                    processing_status=message.processing_status,
-                    detail=save_result.detail,
-                )
 
     parsed = parse_message(message.message_text)
     parse_result = AssistantParseResult(
@@ -282,6 +360,12 @@ async def receive_whatsapp_webhook(
     message.processing_status = (
         decision.status if message.processing_status == "received" else message.processing_status
     )
+    _queue_assistant_reply(
+        db,
+        message,
+        decision.confirmation_prompt,
+        reason="assistant_prompt",
+    )
     db.commit()
     db.refresh(message)
 
@@ -301,6 +385,38 @@ def _require_company(db: Session, company_id: UUID) -> Company:
             detail="Company not found.",
         )
     return company
+
+
+def _require_company_user(db: Session, company_id: UUID, user_id: UUID) -> User:
+    user = db.get(User, user_id)
+    if not user or user.company_id != company_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found for this company.",
+        )
+    return user
+
+
+def _queue_assistant_reply(
+    db: Session,
+    inbound_message: WhatsAppMessage,
+    reply_text: str | None,
+    *,
+    reason: str,
+) -> None:
+    if not reply_text or not inbound_message.company_id or not inbound_message.phone:
+        return
+
+    queue_outbound_text_message(
+        db=db,
+        company_id=inbound_message.company_id,
+        user_id=inbound_message.user_id,
+        to_phone=inbound_message.phone,
+        message_text=reply_text,
+        provider_name=inbound_message.provider_name,
+        provider_account_id=inbound_message.provider_account_id,
+        reason=reason,
+    )
 
 
 def _find_user_by_phone(db: Session, phone: str | None) -> User | None:

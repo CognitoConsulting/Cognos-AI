@@ -1,0 +1,7 @@
+{
+  "to_phone": "+919999999999",
+  "message_text": "Demo reply from Cognos AI. This outbound message is logged for audit.",
+  "provider_name": "generic",
+  "provider_account_id": "local-test-account",
+  "reason": "manual_test"
+}

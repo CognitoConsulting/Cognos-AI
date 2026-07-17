@@ -39,6 +39,15 @@ class WhatsAppMessageRead(ORMBaseModel):
     received_at: datetime
 
 
+class WhatsAppOutboundTextCreate(BaseModel):
+    to_phone: str = Field(min_length=6, max_length=40)
+    message_text: str = Field(min_length=1, max_length=2000)
+    user_id: UUID | None = None
+    provider_name: str | None = Field(default=None, max_length=80)
+    provider_account_id: str | None = Field(default=None, max_length=255)
+    reason: str = Field(default="manual_test", max_length=80)
+
+
 class WhatsAppWebhookAccepted(BaseModel):
     status: str
     message_id: UUID | None = None

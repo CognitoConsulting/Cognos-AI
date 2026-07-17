@@ -56,6 +56,7 @@ Current foundation includes:
 - provider-neutral WhatsApp webhook intake and message audit storage
 - first rule-based assistant parser foundation
 - assistant confirmation/missing-information conversation state foundation
+- provider-neutral outbound WhatsApp reply logging with generic/test simulated delivery
 - reporting record tables for progress, manpower, materials, stock balances, and media/proof files
 - first assistant confirmed-save workflow for WhatsApp replies like “Yes”, “OK”, or “haan”
 - project-selection follow-up when a WhatsApp user belongs to multiple active projects

@@ -434,6 +434,8 @@ Acceptance criteria:
 - assistant can send daily summaries
 - outbound messages are logged
 - delivery status is stored where available
+- generic/test outbound replies are simulated locally for development
+- provider-specific outbound messages are queued until real Meta/provider credentials are configured
 
 Dependencies:
 

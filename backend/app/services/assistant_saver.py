@@ -43,6 +43,7 @@ class ConfirmationSaveResult:
     detail: str
     saved_record_type: str | None = None
     saved_record_count: int = 0
+    reply_text: str | None = None
 
 
 def is_affirmative_confirmation(message_text: str | None) -> bool:
@@ -76,6 +77,7 @@ def save_latest_confirmed_update(
             handled=True,
             processing_status="awaiting_project_selection",
             detail="Confirmation received, but project selection is required before saving.",
+            reply_text=pending_state.confirmation_prompt,
         )
 
     return _save_pending_state_to_project(db, user, pending_state, project)
@@ -108,6 +110,7 @@ def save_project_selection_reply(
             handled=True,
             processing_status="awaiting_project_selection",
             detail="Project selection was not recognized.",
+            reply_text=pending_state.confirmation_prompt,
         )
 
     if match_result.status == "ambiguous":
@@ -119,6 +122,7 @@ def save_project_selection_reply(
             handled=True,
             processing_status="awaiting_project_selection",
             detail="Project selection matched more than one project.",
+            reply_text=pending_state.confirmation_prompt,
         )
 
     return _save_pending_state_to_project(db, user, pending_state, match_result.project)
@@ -141,6 +145,7 @@ def _save_pending_state_to_project(
             handled=True,
             processing_status="permission_denied",
             detail="Confirmation received, but the user is not allowed to save this type of update.",
+            reply_text=pending_state.confirmation_prompt,
         )
 
     record_count = _save_state_to_reporting_records(db, pending_state, project)
@@ -156,6 +161,7 @@ def _save_pending_state_to_project(
         detail="Confirmation received and update saved.",
         saved_record_type=pending_state.pending_intent,
         saved_record_count=record_count,
+        reply_text=pending_state.confirmation_prompt,
     )
 
 
