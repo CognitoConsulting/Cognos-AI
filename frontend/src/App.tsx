@@ -2,6 +2,7 @@ import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
 
 const PLATFORM_ADMIN_TOKEN = "local-dev-platform-admin-token";
 const ACCESS_TOKEN_STORAGE_KEY = "cognos_ai_access_token";
+const REPORTING_PAGE_LIMIT = 500;
 
 type Company = {
   id: string;
@@ -3233,30 +3234,31 @@ async function loadReportingData(
   toDate = "",
 ): Promise<ReportingData> {
   const basePath = `/api/companies/${companyId}/projects/${projectId}/reporting`;
-  const dateRangeQuery = reportingDateRangeQuery(fromDate, toDate);
+  const reportingQuery = reportingListQuery(fromDate, toDate);
+  const currentStateQuery = reportingListQuery();
   const [progress, manpower, materials, stock, media] = await Promise.all([
     optionalApiRequest<ProgressEntry[]>(
-      `${basePath}/progress-entries${dateRangeQuery}`,
+      `${basePath}/progress-entries${reportingQuery}`,
       accessToken,
       [],
     ),
     optionalApiRequest<ManpowerEntry[]>(
-      `${basePath}/manpower-entries${dateRangeQuery}`,
+      `${basePath}/manpower-entries${reportingQuery}`,
       accessToken,
       [],
     ),
     optionalApiRequest<MaterialTransaction[]>(
-      `${basePath}/material-transactions${dateRangeQuery}`,
+      `${basePath}/material-transactions${reportingQuery}`,
       accessToken,
       [],
     ),
     optionalApiRequest<MaterialStockBalance[]>(
-      `${basePath}/material-stock-balances`,
+      `${basePath}/material-stock-balances${currentStateQuery}`,
       accessToken,
       [],
     ),
     optionalApiRequest<MediaFile[]>(
-      `${basePath}/media-files${dateRangeQuery}`,
+      `${basePath}/media-files${reportingQuery}`,
       accessToken,
       [],
     ),
@@ -3278,13 +3280,17 @@ async function loadReportingData(
   };
 }
 
-function reportingDateRangeQuery(fromDate: string, toDate: string): string {
+function reportingListQuery(fromDate = "", toDate = "", offset = 0): string {
   const params = new URLSearchParams();
   if (fromDate) {
     params.set("from_date", fromDate);
   }
   if (toDate) {
     params.set("to_date", toDate);
+  }
+  params.set("limit", String(REPORTING_PAGE_LIMIT));
+  if (offset > 0) {
+    params.set("offset", String(offset));
   }
   const query = params.toString();
   return query ? `?${query}` : "";

@@ -1,7 +1,7 @@
 from datetime import date, datetime, time, timedelta
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -46,6 +46,9 @@ from app.services.media_storage import resolve_media_access
 
 router = APIRouter(prefix="/companies/{company_id}/projects/{project_id}/reporting")
 
+DEFAULT_REPORTING_PAGE_LIMIT = 500
+MAX_REPORTING_PAGE_LIMIT = 1000
+
 
 @router.post(
     "/progress-entries",
@@ -74,6 +77,8 @@ def list_progress_entries(
     project_id: UUID,
     from_date: date | None = None,
     to_date: date | None = None,
+    limit: int = Query(DEFAULT_REPORTING_PAGE_LIMIT, ge=1, le=MAX_REPORTING_PAGE_LIMIT),
+    offset: int = Query(0, ge=0),
     auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_database_session),
 ) -> list[ProgressEntry]:
@@ -93,7 +98,11 @@ def list_progress_entries(
     query = _apply_date_range(query, ProgressEntry.work_date, from_date, to_date)
     return list(
         db.scalars(
-            query.order_by(ProgressEntry.work_date.desc(), ProgressEntry.created_at.desc())
+            _apply_pagination(
+                query.order_by(ProgressEntry.work_date.desc(), ProgressEntry.created_at.desc()),
+                limit,
+                offset,
+            )
         ).all()
     )
 
@@ -122,6 +131,8 @@ def list_manpower_entries(
     project_id: UUID,
     from_date: date | None = None,
     to_date: date | None = None,
+    limit: int = Query(DEFAULT_REPORTING_PAGE_LIMIT, ge=1, le=MAX_REPORTING_PAGE_LIMIT),
+    offset: int = Query(0, ge=0),
     auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_database_session),
 ) -> list[ManpowerEntry]:
@@ -141,7 +152,11 @@ def list_manpower_entries(
     query = _apply_date_range(query, ManpowerEntry.work_date, from_date, to_date)
     return list(
         db.scalars(
-            query.order_by(ManpowerEntry.work_date.desc(), ManpowerEntry.trade_name)
+            _apply_pagination(
+                query.order_by(ManpowerEntry.work_date.desc(), ManpowerEntry.trade_name),
+                limit,
+                offset,
+            )
         ).all()
     )
 
@@ -177,6 +192,8 @@ def list_material_transactions(
     project_id: UUID,
     from_date: date | None = None,
     to_date: date | None = None,
+    limit: int = Query(DEFAULT_REPORTING_PAGE_LIMIT, ge=1, le=MAX_REPORTING_PAGE_LIMIT),
+    offset: int = Query(0, ge=0),
     auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_database_session),
 ) -> list[MaterialTransaction]:
@@ -201,9 +218,13 @@ def list_material_transactions(
     )
     return list(
         db.scalars(
-            query.order_by(
-                MaterialTransaction.transaction_date.desc(),
-                MaterialTransaction.created_at.desc(),
+            _apply_pagination(
+                query.order_by(
+                    MaterialTransaction.transaction_date.desc(),
+                    MaterialTransaction.created_at.desc(),
+                ),
+                limit,
+                offset,
             )
         ).all()
     )
@@ -240,6 +261,8 @@ def create_material_stock_balance(
 def list_material_stock_balances(
     company_id: UUID,
     project_id: UUID,
+    limit: int = Query(DEFAULT_REPORTING_PAGE_LIMIT, ge=1, le=MAX_REPORTING_PAGE_LIMIT),
+    offset: int = Query(0, ge=0),
     auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_database_session),
 ) -> list[MaterialStockBalance]:
@@ -252,10 +275,14 @@ def list_material_stock_balances(
     )
     return list(
         db.scalars(
-            select(MaterialStockBalance)
-            .where(MaterialStockBalance.company_id == company_id)
-            .where(MaterialStockBalance.project_id == project_id)
-            .order_by(MaterialStockBalance.material_name)
+            _apply_pagination(
+                select(MaterialStockBalance)
+                .where(MaterialStockBalance.company_id == company_id)
+                .where(MaterialStockBalance.project_id == project_id)
+                .order_by(MaterialStockBalance.material_name),
+                limit,
+                offset,
+            )
         ).all()
     )
 
@@ -284,6 +311,8 @@ def list_media_files(
     project_id: UUID,
     from_date: date | None = None,
     to_date: date | None = None,
+    limit: int = Query(DEFAULT_REPORTING_PAGE_LIMIT, ge=1, le=MAX_REPORTING_PAGE_LIMIT),
+    offset: int = Query(0, ge=0),
     auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_database_session),
 ) -> list[MediaFile]:
@@ -297,7 +326,7 @@ def list_media_files(
     query = _apply_datetime_date_range(query, MediaFile.created_at, from_date, to_date)
     return list(
         db.scalars(
-            query.order_by(MediaFile.created_at.desc())
+            _apply_pagination(query.order_by(MediaFile.created_at.desc()), limit, offset)
         ).all()
     )
 
@@ -377,6 +406,10 @@ def _apply_datetime_date_range(query, field, from_date: date | None, to_date: da
     if to_date:
         query = query.where(field < datetime.combine(to_date + timedelta(days=1), time.min))
     return query
+
+
+def _apply_pagination(query, limit: int, offset: int):
+    return query.offset(offset).limit(limit)
 
 
 def _commit[T](db: Session, entity: T) -> T:

@@ -718,6 +718,8 @@ Acceptance criteria:
 - filters support date and date range
 - reporting APIs support `from_date` and `to_date` for progress, manpower, material transaction, and media/proof lists
 - dashboard sends the selected date range to reporting APIs instead of only filtering after loading all rows
+- reporting APIs support `limit` and `offset` so large projects can be loaded in bounded pages
+- dashboard reporting requests are capped to the MVP page size until full page navigation is added
 - filters support user, activity, and material where relevant
 
 Dependencies:
