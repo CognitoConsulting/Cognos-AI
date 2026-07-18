@@ -50,6 +50,7 @@ from app.services.whatsapp_provider import (
     normalize_inbound_message,
     queue_outbound_text_message,
 )
+from app.services.whatsapp_media import resolve_provider_media_url
 from app.services.voice_transcription import is_voice_media_type, transcribe_voice_note
 
 router = APIRouter()
@@ -247,6 +248,10 @@ async def receive_whatsapp_webhook(
         normalized.provider_name,
         normalized.provider_account_id,
     )
+    provider_media_resolution = _resolve_provider_media_if_possible(
+        normalized,
+        provider_account,
+    )
     user = _find_user_by_phone(db, normalized.phone)
     company_id = (
         user.company_id
@@ -266,12 +271,7 @@ async def receive_whatsapp_webhook(
         provider_name=normalized.provider_name,
         provider_message_id=normalized.provider_message_id,
         provider_account_id=normalized.provider_account_id,
-        raw_provider_payload={
-            **normalized.raw_payload,
-            "_cognos_media": _normalized_media_audit_payload(normalized),
-        }
-        if normalized.media_type
-        else normalized.raw_payload,
+        raw_provider_payload=_raw_provider_payload(normalized, provider_media_resolution),
         processing_status=processing_status,
     )
     db.add(message)
@@ -608,7 +608,7 @@ def _save_inbound_media_if_possible(
         file_name=normalized.media_file_name,
         caption=normalized.media_caption or message.message_text,
         provider_media_id=normalized.provider_media_id,
-        processing_status="stored" if normalized.media_url else "provider_reference",
+        processing_status="stored" if _media_has_storable_url(normalized) else "provider_reference",
         captured_at=message.received_at,
     )
     db.add(media_file)
@@ -860,7 +860,7 @@ def _media_storage_url_from_payload(provider_name: str, media_payload: dict) -> 
 
 
 def _media_storage_url(normalized) -> str:
-    if normalized.media_url:
+    if _media_has_storable_url(normalized):
         return normalized.media_url
     return f"provider://{normalized.provider_name}/{normalized.provider_media_id or 'media'}"
 
@@ -868,13 +868,49 @@ def _media_storage_url(normalized) -> str:
 def _normalized_media_audit_payload(normalized) -> dict[str, str | None]:
     return {
         "media_type": normalized.media_type,
-        "media_url": normalized.media_url,
+        "media_url": normalized.media_url if _media_has_storable_url(normalized) else None,
+        "media_url_status": "runtime_only" if normalized.media_download_headers else None,
         "media_file_name": normalized.media_file_name,
         "provider_media_id": normalized.provider_media_id,
         "media_caption": normalized.media_caption,
         "media_mime_type": normalized.media_mime_type,
         "transcription_text": normalized.transcription_text,
     }
+
+
+def _media_has_storable_url(normalized) -> bool:
+    return bool(normalized.media_url and not normalized.media_download_headers)
+
+
+def _raw_provider_payload(normalized, provider_media_resolution) -> dict:
+    if not normalized.media_type:
+        return normalized.raw_payload
+
+    payload = {
+        **normalized.raw_payload,
+        "_cognos_media": _normalized_media_audit_payload(normalized),
+    }
+    if provider_media_resolution:
+        payload["_cognos_provider_media_resolution"] = {
+            **(provider_media_resolution.audit_payload or {}),
+            "status": provider_media_resolution.status,
+            "error_message": provider_media_resolution.error_message,
+        }
+    return payload
+
+
+def _resolve_provider_media_if_possible(normalized, provider_account):
+    if not normalized.media_type:
+        return None
+
+    resolution = resolve_provider_media_url(normalized, provider_account)
+    if resolution.media_url:
+        normalized.media_url = resolution.media_url
+    if resolution.mime_type and not normalized.media_mime_type:
+        normalized.media_mime_type = resolution.mime_type
+    if resolution.download_headers:
+        normalized.media_download_headers = resolution.download_headers
+    return resolution
 
 
 def _capture_voice_note_if_possible(

@@ -108,7 +108,7 @@ def transcribe_voice_note(normalized_message, company: Company | None = None) ->
             provider_name=api_key_result.provider_name,
             error_message=(
                 "The voice note does not include a downloadable media URL yet. "
-                "Provider media-ID download is still future work."
+                "Provider media URL resolution did not complete."
             ),
         )
 
@@ -132,6 +132,7 @@ def transcribe_voice_note(normalized_message, company: Company | None = None) ->
         media_url=media_url,
         file_name=normalized_message.media_file_name,
         mime_type=normalized_message.media_mime_type,
+        download_headers=normalized_message.media_download_headers,
     )
     if audio_result.error_message:
         return VoiceTranscriptionResult(
@@ -247,8 +248,10 @@ def _download_audio_file(
     media_url: str,
     file_name: str | None,
     mime_type: str | None,
+    download_headers: dict[str, str] | None = None,
 ) -> DownloadedAudio:
-    request = urllib.request.Request(media_url, headers={"User-Agent": "Cognos-AI/0.1"})
+    request_headers = {"User-Agent": "Cognos-AI/0.1", **(download_headers or {})}
+    request = urllib.request.Request(media_url, headers=request_headers)
     try:
         with urllib.request.urlopen(
             request,

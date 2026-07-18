@@ -384,13 +384,28 @@ OPENAI_API_KEY=<platform-managed-openai-key>
 OPENAI_TRANSCRIPTION_MODEL=gpt-4o-mini-transcribe
 ```
 
+For Meta WhatsApp Cloud API media-ID lookup:
+
+```bash
+META_WHATSAPP_ACCESS_TOKEN=<meta-whatsapp-cloud-api-token>
+META_GRAPH_API_VERSION=v23.0
+```
+
+For account-specific local testing, you can also set:
+
+```bash
+META_WHATSAPP_ACCESS_TOKEN_<PHONE_NUMBER_ID_OR_PROVIDER_ACCOUNT_ID>=<meta-whatsapp-cloud-api-token>
+```
+
 For company-owned AI mode, do not store raw keys in the database. For local/pilot testing, set:
 
 ```bash
 COGNOS_COMPANY_OPENAI_API_KEY_<COMPANY_ID_WITH_HYPHENS_REPLACED_BY_UNDERSCORES>=<company-owned-openai-key>
 ```
 
-The adapter supports OpenAI file-transcription formats such as flac, mp3, mp4, mpeg, mpga, m4a, ogg, wav, and webm. If the selected WhatsApp provider sends only a media ID instead of a downloadable URL, provider-specific media download still needs to be added.
+The adapter supports OpenAI file-transcription formats such as flac, mp3, mp4, mpeg, mpga, m4a, ogg, wav, and webm.
+
+For Meta payloads that include only a media ID, the backend can resolve the media ID into a short-lived URL before transcription. The resolved URL is treated as runtime-only and is not stored permanently in the audit payload.
 
 List stored voice notes:
 

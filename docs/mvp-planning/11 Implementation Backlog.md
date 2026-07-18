@@ -561,7 +561,10 @@ Acceptance criteria:
 - first OpenAI transcription adapter supports downloadable flac, mp3, mp4, mpeg, mpga, m4a, ogg, wav, and webm audio files
 - platform-managed transcription uses `OPENAI_API_KEY`
 - company-owned transcription can use a runtime secret environment variable without storing raw keys in the database
-- provider-specific media-ID download is still future work when the WhatsApp provider does not supply a downloadable media URL
+- first Meta WhatsApp adapter can resolve provider media IDs into short-lived downloadable URLs
+- Meta access tokens are loaded from runtime secrets, not stored in normal database records
+- resolved Meta media URLs are treated as runtime-only and are not stored permanently in the Cognos audit payload
+- long-term object storage for downloaded media is still future work
 
 Dependencies:
 

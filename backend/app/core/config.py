@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     openai_transcription_model: str = "gpt-4o-mini-transcribe"
     voice_transcription_max_bytes: int = 25 * 1024 * 1024
     voice_transcription_download_timeout_seconds: int = 20
+    meta_whatsapp_access_token: SecretStr | None = None
+    meta_graph_api_version: str = "v23.0"
+    whatsapp_media_download_timeout_seconds: int = 20
     database_url: str = Field(
         default="postgresql+psycopg://cognos:cognos@db:5432/cognos_ai"
     )
