@@ -68,6 +68,7 @@ Current foundation includes:
 - first Meta WhatsApp media-ID URL resolution adapter for inbound media
 - first local object-storage-style media persistence for WhatsApp images/proofs and voice notes
 - first S3-compatible media storage provider interface for AWS S3 / Cloudflare R2-style storage
+- permission-checked media access endpoints for stored project proofs and voice notes
 - first assistant confirmed-save workflow for WhatsApp replies like “Yes”, “OK”, or “haan”
 - first assistant correction workflow for replies like “change quantity to 60” before final save
 - first missing-information follow-up workflow for short replies like “50 bags” after the assistant asks for missing details

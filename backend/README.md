@@ -166,9 +166,19 @@ MEDIA_STORAGE_S3_PUBLIC_BASE_URL=<optional-public-cdn-base-url>
 MEDIA_STORAGE_S3_PREFIX=<optional-key-prefix>
 MEDIA_STORAGE_S3_ACCESS_KEY_ID=<access-key-id>
 MEDIA_STORAGE_S3_SECRET_ACCESS_KEY=<secret-access-key>
+MEDIA_STORAGE_S3_PRESIGNED_URL_TTL_SECONDS=600
 ```
 
 If `MEDIA_STORAGE_S3_PUBLIC_BASE_URL` is provided, the database stores a public/CDN URL. Otherwise, it stores an internal reference like `storage://s3_compatible/<bucket>/<object-key>`.
+
+Stored media should be opened through the backend, not by exposing internal storage paths directly:
+
+```text
+GET /companies/{company_id}/projects/{project_id}/reporting/media-files/{media_file_id}/access
+GET /companies/{company_id}/whatsapp/voice-notes/{voice_note_id}/access
+```
+
+These access endpoints check the user's company/project permission first. Local files are returned as file responses. Private S3-compatible files are returned as short-lived presigned links. If a public/CDN base URL is configured, the endpoint redirects there after permission is checked.
 
 Platform-managed AI mode uses `OPENAI_API_KEY`.
 

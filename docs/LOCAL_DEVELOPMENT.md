@@ -428,15 +428,32 @@ MEDIA_STORAGE_S3_PUBLIC_BASE_URL=<optional-public-cdn-base-url>
 MEDIA_STORAGE_S3_PREFIX=<optional-key-prefix>
 MEDIA_STORAGE_S3_ACCESS_KEY_ID=<access-key-id>
 MEDIA_STORAGE_S3_SECRET_ACCESS_KEY=<secret-access-key>
+MEDIA_STORAGE_S3_PRESIGNED_URL_TTL_SECONDS=600
 ```
 
 Use `MEDIA_STORAGE_S3_ENDPOINT_URL` for Cloudflare R2 or any non-AWS S3-compatible provider. Leave it empty for standard AWS S3.
+
+Open a stored project image/proof through the permission-checked backend endpoint:
+
+```bash
+curl -L http://localhost:8000/companies/<company_id>/projects/<project_id>/reporting/media-files/<media_file_id>/access \
+  -H "Authorization: Bearer <user_token>" \
+  --output proof-file
+```
 
 List stored voice notes:
 
 ```bash
 curl http://localhost:8000/companies/<company_id>/whatsapp/voice-notes \
   -H "X-Platform-Admin-Token: local-dev-platform-admin-token"
+```
+
+Open a stored voice note:
+
+```bash
+curl -L http://localhost:8000/companies/<company_id>/whatsapp/voice-notes/<voice_note_id>/access \
+  -H "X-Platform-Admin-Token: local-dev-platform-admin-token" \
+  --output voice-note
 ```
 
 Send a Meta-style test webhook:

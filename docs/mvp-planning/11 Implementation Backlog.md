@@ -566,6 +566,7 @@ Acceptance criteria:
 - resolved Meta media URLs are treated as runtime-only and are not stored permanently in the Cognos audit payload
 - first local object-storage-style adapter stores inbound media files and saves `storage://local/...` references
 - first S3-compatible storage provider interface supports AWS S3, Cloudflare R2, and similar object storage services
+- stored voice notes can be opened through a permission-checked backend access endpoint
 - Azure Blob storage is still future work
 
 Dependencies:
@@ -593,6 +594,7 @@ Acceptance criteria:
 - media can auto-link to the same user's latest recent progress, manpower, or material entry
 - material proof status is marked attached when media links to a material transaction
 - first local storage adapter persists downloaded image/proof files before saving the media record
+- stored image/proof files can be opened through a permission-checked backend access endpoint
 - caption is processed if present
 - if caption is missing, assistant asks what the image relates to
 - downloading provider media into long-term object storage is still future work
