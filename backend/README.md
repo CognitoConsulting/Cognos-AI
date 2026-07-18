@@ -52,6 +52,7 @@ The first foundation APIs allow platform-admin setup of:
 - sample Excel template download
 - Excel template upload/import
 - WhatsApp provider account setup
+- company AI setting updates for platform-managed or company-owned AI mode
 - provider-neutral WhatsApp webhook intake
 - inbound WhatsApp message audit storage
 - first assistant parser result storage
@@ -67,6 +68,21 @@ X-Platform-Admin-Token: local-dev-platform-admin-token
 ```
 
 This is a temporary foundation gate, not the final production authentication system.
+
+## AI configuration foundation
+
+The backend stores a company-level AI mode:
+
+- `platform_managed`: Cognos AI manages the model credentials behind the scenes
+- `company_owned`: the customer intends to use its own AI credentials
+
+Owner/admin users can update the mode and AI insights subscription flag through:
+
+```text
+PUT /companies/{company_id}/ai-settings
+```
+
+This endpoint does not accept or store real API keys yet. Secure key entry should be added only with encrypted storage, masking, validation, and audit logging.
 
 ## Knowledgebase template imports
 

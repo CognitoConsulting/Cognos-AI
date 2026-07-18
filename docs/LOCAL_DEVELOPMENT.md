@@ -70,6 +70,7 @@ Owner/admin users can also manage daily WhatsApp summary settings, preview the s
 They can also review company-level inbound and outbound WhatsApp message logs for pilot debugging.
 The WhatsApp panel also lets owner/admin users add and review provider accounts for local/generic testing or future Meta Cloud API setup.
 Owner/admin users can also review assistant parse results, missing fields, and conversation states to debug natural-language WhatsApp workflows.
+Owner/admin users can configure company AI mode as platform-managed or company-owned from the Settings section.
 
 This is still a development dashboard. The backend enforces role-aware API access, and the frontend now adapts the visible navigation, analytics, reporting tables, export buttons, empty states, and restricted messages to the signed-in user's role.
 
@@ -86,13 +87,14 @@ Owner/admin users can also use the first team-management panel to:
 - review inbound/outbound WhatsApp message logs
 - add and review WhatsApp provider accounts
 - review assistant parse results and conversation states
+- configure company AI mode and AI insights subscription status
 - view company users
 - create company users
 - view selected-project assignments
 - assign users to the selected project with progress, manpower, material, and dashboard permissions
 - export the selected reporting view as one `.xlsx` workbook with separate accessible sheets
 
-Editing imported knowledgebase records, editing projects, archiving projects, editing users, deactivating users, and removing project assignments are not implemented yet.
+Editing imported knowledgebase records, editing projects, archiving projects, editing users, deactivating users, removing project assignments, and storing real company-owned AI keys are not implemented yet.
 
 ## Seed demo data
 

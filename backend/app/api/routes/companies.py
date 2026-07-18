@@ -15,7 +15,7 @@ from app.api.deps import (
     require_platform_admin,
 )
 from app.models import Company, Project, ProjectUser, User
-from app.schemas.company import CompanyCreate, CompanyRead
+from app.schemas.company import CompanyAISettingsUpdate, CompanyCreate, CompanyRead
 from app.schemas.project import ProjectCreate, ProjectRead
 from app.schemas.project_user import ProjectUserCreate, ProjectUserRead
 from app.schemas.user import UserCreate, UserRead
@@ -71,6 +71,22 @@ def get_company(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Company not found.",
         )
+    return company
+
+
+@router.put("/{company_id}/ai-settings", response_model=CompanyRead)
+def update_company_ai_settings(
+    company_id: UUID,
+    payload: CompanyAISettingsUpdate,
+    auth: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_database_session),
+) -> Company:
+    require_company_admin_access(db, company_id, auth)
+    company = _require_company(db, company_id)
+    company.ai_key_mode = payload.ai_key_mode
+    company.ai_subscription_enabled = payload.ai_subscription_enabled
+    db.commit()
+    db.refresh(company)
     return company
 
 

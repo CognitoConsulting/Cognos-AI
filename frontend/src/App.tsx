@@ -7,6 +7,9 @@ type Company = {
   id: string;
   name: string;
   status: string;
+  ai_key_mode: string;
+  ai_subscription_enabled: boolean;
+  created_at: string;
 };
 
 type Project = {
@@ -358,6 +361,11 @@ const emptyWhatsAppProviderForm = {
   status: "active",
 };
 
+const emptyAiConfigurationForm = {
+  aiKeyMode: "platform_managed",
+  aiSubscriptionEnabled: false,
+};
+
 function defaultAssignmentForm() {
   return {
     userId: "",
@@ -402,6 +410,7 @@ export function App() {
   >([]);
   const [dailySummaryForm, setDailySummaryForm] = useState(emptyDailySummaryForm);
   const [whatsAppProviderForm, setWhatsAppProviderForm] = useState(emptyWhatsAppProviderForm);
+  const [aiConfigurationForm, setAiConfigurationForm] = useState(emptyAiConfigurationForm);
   const [dailySummaryDate, setDailySummaryDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [loadingMessage, setLoadingMessage] = useState("Loading companies...");
   const [errorMessage, setErrorMessage] = useState("");
@@ -417,6 +426,8 @@ export function App() {
   const [whatsAppErrorMessage, setWhatsAppErrorMessage] = useState("");
   const [assistantMessage, setAssistantMessage] = useState("");
   const [assistantErrorMessage, setAssistantErrorMessage] = useState("");
+  const [aiConfigurationMessage, setAiConfigurationMessage] = useState("");
+  const [aiConfigurationErrorMessage, setAiConfigurationErrorMessage] = useState("");
 
   useEffect(() => {
     if (!accessToken) {
@@ -605,6 +616,18 @@ export function App() {
       });
   }, [selectedCompanyId, currentUser, accessToken]);
 
+  useEffect(() => {
+    const company = companies.find((candidate) => candidate.id === selectedCompanyId);
+    if (!company) {
+      setAiConfigurationForm(emptyAiConfigurationForm);
+      return;
+    }
+
+    setAiConfigurationForm(formFromCompanyAISettings(company));
+    setAiConfigurationMessage("");
+    setAiConfigurationErrorMessage("");
+  }, [companies, selectedCompanyId]);
+
   const filteredData = useMemo(
     () => filterReportingData(reportingData, fromDate, toDate),
     [reportingData, fromDate, toDate],
@@ -624,6 +647,7 @@ export function App() {
   const canManageDailySummary = currentUser ? isCompanyAdmin(currentUser.role) : false;
   const canViewWhatsAppAudit = currentUser ? isCompanyAdmin(currentUser.role) : false;
   const canViewAssistantAudit = currentUser ? isCompanyAdmin(currentUser.role) : false;
+  const canManageAiConfiguration = currentUser ? isCompanyAdmin(currentUser.role) : false;
   const canExportWorkbook =
     filteredData.access.progress ||
     filteredData.access.manpower ||
@@ -905,6 +929,34 @@ export function App() {
     }
   }
 
+  async function handleSaveAiConfiguration(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selectedCompanyId) {
+      return;
+    }
+
+    setAiConfigurationMessage("");
+    setAiConfigurationErrorMessage("");
+    try {
+      const updatedCompany = await updateCompanyAISettings(
+        selectedCompanyId,
+        accessToken,
+        aiConfigurationForm,
+      );
+      setCompanies((existingCompanies) =>
+        existingCompanies.map((company) =>
+          company.id === updatedCompany.id ? updatedCompany : company,
+        ),
+      );
+      setAiConfigurationForm(formFromCompanyAISettings(updatedCompany));
+      setAiConfigurationMessage("AI configuration saved.");
+    } catch (error) {
+      setAiConfigurationErrorMessage(
+        error instanceof Error ? error.message : "Could not save AI configuration.",
+      );
+    }
+  }
+
   async function handleCreateWhatsAppProviderAccount(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selectedCompanyId) {
@@ -1108,6 +1160,17 @@ export function App() {
             onFileChange={setKnowledgeFile}
             onDownloadTemplate={handleDownloadKnowledgeTemplate}
             onImportTemplate={handleImportKnowledgeTemplate}
+          />
+        ) : null}
+
+        {canManageAiConfiguration ? (
+          <AiConfigurationPanel
+            selectedCompany={selectedCompany}
+            form={aiConfigurationForm}
+            aiConfigurationMessage={aiConfigurationMessage}
+            aiConfigurationErrorMessage={aiConfigurationErrorMessage}
+            onFormChange={setAiConfigurationForm}
+            onSaveSettings={handleSaveAiConfiguration}
           />
         ) : null}
 
@@ -1734,6 +1797,105 @@ function KnowledgebaseManagementPanel({
   );
 }
 
+function AiConfigurationPanel({
+  selectedCompany,
+  form,
+  aiConfigurationMessage,
+  aiConfigurationErrorMessage,
+  onFormChange,
+  onSaveSettings,
+}: {
+  selectedCompany: Company | undefined;
+  form: typeof emptyAiConfigurationForm;
+  aiConfigurationMessage: string;
+  aiConfigurationErrorMessage: string;
+  onFormChange: (form: typeof emptyAiConfigurationForm) => void;
+  onSaveSettings: (event: FormEvent<HTMLFormElement>) => void;
+}) {
+  return (
+    <section className="management-section" id="settings">
+      <div className="section-heading reporting-heading">
+        <div>
+          <p className="eyebrow">AI settings</p>
+          <h3>Configure company AI usage</h3>
+          <p>
+            Choose whether this company uses Cognos AI&apos;s platform-managed AI keys or its own
+            company-owned AI setup. Actual secret entry/storage is intentionally deferred until the
+            secure key vault work is added.
+          </p>
+        </div>
+        <div className="health-row" aria-label="AI settings status">
+          <span className="health-pill">{formatRole(form.aiKeyMode)}</span>
+          <span className={`health-pill ${form.aiSubscriptionEnabled ? "normal" : "warning"}`}>
+            AI insights {form.aiSubscriptionEnabled ? "enabled" : "off"}
+          </span>
+        </div>
+      </div>
+
+      {aiConfigurationMessage ? <p className="status-message">{aiConfigurationMessage}</p> : null}
+      {aiConfigurationErrorMessage ? (
+        <p className="error-message">{aiConfigurationErrorMessage}</p>
+      ) : null}
+
+      <section className="dashboard-grid">
+        <article className="panel">
+          <h3>Company AI configuration</h3>
+          <p>
+            Selected company: <strong>{selectedCompany?.name ?? "No company selected"}</strong>
+          </p>
+          <form className="stacked-form" onSubmit={onSaveSettings}>
+            <label>
+              AI key mode
+              <select
+                value={form.aiKeyMode}
+                onChange={(event) =>
+                  onFormChange({ ...form, aiKeyMode: event.target.value })
+                }
+              >
+                <option value="platform_managed">Platform-managed keys</option>
+                <option value="company_owned">Company-owned keys</option>
+              </select>
+            </label>
+            <label className="inline-check">
+              <input
+                type="checkbox"
+                checked={form.aiSubscriptionEnabled}
+                onChange={(event) =>
+                  onFormChange({
+                    ...form,
+                    aiSubscriptionEnabled: event.target.checked,
+                  })
+                }
+              />
+              Enable AI insights for this company
+            </label>
+            <button type="submit" disabled={!selectedCompany}>
+              Save AI settings
+            </button>
+          </form>
+        </article>
+
+        <article className="panel">
+          <h3>What this means</h3>
+          <p>
+            Platform-managed mode is the easiest pilot option: Cognos AI owns and manages the model
+            credentials behind the scenes.
+          </p>
+          <p>
+            Company-owned mode is for customers who want their own AI billing, procurement, or data
+            governance path. In this foundation, the mode can be selected, but real API keys are not
+            collected yet.
+          </p>
+          <p className="muted-note">
+            Next secure step: encrypted secret storage, masked key display, key validation, and
+            audit logging for changes.
+          </p>
+        </article>
+      </section>
+    </section>
+  );
+}
+
 function DailySummaryManagementPanel({
   selectedProject,
   setting,
@@ -1764,7 +1926,7 @@ function DailySummaryManagementPanel({
   onSendNow: () => void;
 }) {
   return (
-    <section className="management-section" id="settings">
+    <section className="management-section" id="daily-summary-settings">
       <div className="section-heading reporting-heading">
         <div>
           <p className="eyebrow">Daily WhatsApp summary</p>
@@ -2578,6 +2740,20 @@ async function loadDailySummaryWorkspace(
     loadDailySummaryMessages(companyId, projectId, accessToken),
   ]);
   return { setting, preview, messages };
+}
+
+async function updateCompanyAISettings(
+  companyId: string,
+  accessToken: string,
+  form: typeof emptyAiConfigurationForm,
+): Promise<Company> {
+  return apiRequest<Company>(`/api/companies/${companyId}/ai-settings`, accessToken, {
+    method: "PUT",
+    body: JSON.stringify({
+      ai_key_mode: form.aiKeyMode,
+      ai_subscription_enabled: form.aiSubscriptionEnabled,
+    }),
+  });
 }
 
 async function loadDailySummarySetting(
@@ -3567,6 +3743,13 @@ function formFromDailySummarySetting(setting: DailySummarySetting): typeof empty
     sendTimeLocal: formatTime(setting.send_time_local),
     timezone: setting.timezone,
     recipientScope: setting.recipient_scope,
+  };
+}
+
+function formFromCompanyAISettings(company: Company): typeof emptyAiConfigurationForm {
+  return {
+    aiKeyMode: company.ai_key_mode,
+    aiSubscriptionEnabled: company.ai_subscription_enabled,
   };
 }
 

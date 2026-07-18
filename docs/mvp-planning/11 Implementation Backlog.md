@@ -525,9 +525,11 @@ Acceptance criteria:
 
 - company can use platform-managed AI keys
 - company can be configured for company-owned AI keys
+- owner/admin dashboard can update AI mode and AI insights subscription status
+- backend exposes a company AI settings endpoint
 - keys are stored securely
 - keys are never logged
-- self-service UI may be deferred if needed for pilot
+- real company-owned key entry, validation, masking, and encrypted storage are still future secure-secret work
 
 Dependencies:
 
