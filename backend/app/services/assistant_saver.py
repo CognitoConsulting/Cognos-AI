@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
@@ -35,6 +36,66 @@ AFFIRMATIVE_REPLIES = {
     "sahi hai",
 }
 
+CORRECTION_TERMS = {
+    "change",
+    "correct",
+    "correction",
+    "update",
+    "replace",
+    "actually",
+    "instead",
+    "galat",
+    "sahi",
+    "badal",
+}
+
+CORRECTION_FIELD_TERMS = {
+    "qty",
+    "quantity",
+    "unit",
+    "location",
+    "area",
+    "material",
+    "activity",
+    "trade",
+    "worker",
+    "workers",
+    "mason",
+    "helper",
+    "labour",
+    "labor",
+    "mazdoor",
+    "electrician",
+    "plumber",
+    "carpenter",
+    "painter",
+}
+
+UNIT_TERMS = {
+    "sqm",
+    "sqft",
+    "cum",
+    "bags",
+    "bag",
+    "kg",
+    "ton",
+    "tons",
+    "nos",
+    "pieces",
+}
+
+TRADE_TERMS = {
+    "mason",
+    "helper",
+    "labour",
+    "labor",
+    "mazdoor",
+    "electrician",
+    "plumber",
+    "carpenter",
+    "painter",
+}
+
 
 @dataclass(frozen=True)
 class ConfirmationSaveResult:
@@ -49,6 +110,50 @@ class ConfirmationSaveResult:
 def is_affirmative_confirmation(message_text: str | None) -> bool:
     normalized = (message_text or "").strip().lower().strip(".! ")
     return normalized in AFFIRMATIVE_REPLIES
+
+
+def apply_pending_confirmation_correction(
+    db: Session,
+    user: User,
+    correction_message_text: str | None,
+) -> ConfirmationSaveResult:
+    pending_state = _find_latest_pending_confirmation(db, user)
+    if not pending_state:
+        return ConfirmationSaveResult(
+            handled=False,
+            processing_status="no_pending_confirmation",
+            detail="No pending assistant confirmation was found for this user.",
+        )
+
+    correction = _extract_correction(
+        pending_state.pending_intent,
+        pending_state.pending_data or {},
+        correction_message_text,
+    )
+    if not correction:
+        return ConfirmationSaveResult(
+            handled=False,
+            processing_status="no_correction_detected",
+            detail="No correction fields were detected in this reply.",
+        )
+
+    pending_data = dict(pending_state.pending_data or {})
+    pending_data.update(correction)
+    pending_state.pending_data = pending_data
+    pending_state.last_user_message = correction_message_text
+    pending_state.confirmation_prompt = _build_corrected_confirmation_prompt(
+        pending_state.pending_intent,
+        pending_data,
+    )
+    pending_state.updated_at = datetime.utcnow()
+    db.commit()
+
+    return ConfirmationSaveResult(
+        handled=True,
+        processing_status="awaiting_confirmation_corrected",
+        detail="Assistant confirmation was corrected and is waiting for confirmation again.",
+        reply_text=pending_state.confirmation_prompt,
+    )
 
 
 def save_latest_confirmed_update(
@@ -189,6 +294,146 @@ def _find_latest_project_selection_state(
         .where(AssistantConversationState.status == "awaiting_project_selection")
         .order_by(AssistantConversationState.updated_at.desc())
     )
+
+
+def _extract_correction(
+    intent: str,
+    pending_data: dict,
+    message_text: str | None,
+) -> dict | None:
+    text = (message_text or "").strip()
+    lowered = text.lower()
+    if not text or not _looks_like_correction(lowered):
+        return None
+
+    correction: dict = {}
+    quantity, unit = _extract_quantity_and_unit(lowered)
+    if intent in {"progress", "material_received", "material_issued"}:
+        if quantity is not None:
+            correction["quantity"] = quantity
+        if unit:
+            correction["unit"] = unit
+        else:
+            unit_only = _extract_unit_only(lowered)
+            if unit_only:
+                correction["unit"] = unit_only
+
+    if intent in {"progress", "material_received", "material_issued"}:
+        activity = _extract_named_value(text, ["activity", "work", "kaam"])
+        material = _extract_named_value(text, ["material"])
+        if activity and intent == "progress":
+            correction["activity"] = activity
+        if material and intent in {"material_received", "material_issued"}:
+            correction["material"] = material
+
+    location = _extract_named_value(text, ["location", "area", "site"])
+    if not location:
+        location = _extract_location(text)
+    if location:
+        correction["location"] = location
+
+    if intent == "manpower":
+        trade_counts = _extract_trade_counts(lowered)
+        if trade_counts:
+            existing_counts = dict(pending_data.get("trade_counts") or {})
+            existing_counts.update(trade_counts)
+            correction["trade_counts"] = existing_counts
+
+    if not correction:
+        return None
+    return correction
+
+
+def _looks_like_correction(lowered: str) -> bool:
+    if any(term in lowered for term in CORRECTION_TERMS):
+        return True
+    if any(term in lowered for term in CORRECTION_FIELD_TERMS):
+        return True
+    quantity, unit = _extract_quantity_and_unit(lowered)
+    return bool(quantity is not None and unit and len(lowered.split()) <= 4)
+
+
+def _extract_quantity_and_unit(lowered: str) -> tuple[float | None, str | None]:
+    unit_pattern = "|".join(sorted(UNIT_TERMS, key=len, reverse=True))
+    quantity_with_unit = re.search(rf"\b(\d+(?:\.\d+)?)\s*({unit_pattern})\b", lowered)
+    if quantity_with_unit:
+        return float(quantity_with_unit.group(1)), quantity_with_unit.group(2)
+
+    quantity = re.search(
+        r"\b(?:qty|quantity|change quantity to|quantity to|make it|actually)\s*(?:is|to|=)?\s*(\d+(?:\.\d+)?)\b",
+        lowered,
+    )
+    unit = re.search(rf"\b(?:unit|in)\s*(?:is|to|=)?\s*({unit_pattern})\b", lowered)
+    if quantity:
+        return float(quantity.group(1)), unit.group(1) if unit else None
+
+    loose_number = re.search(r"\b(\d+(?:\.\d+)?)\b", lowered)
+    return (float(loose_number.group(1)), unit.group(1) if unit else None) if loose_number else (None, None)
+
+
+def _extract_unit_only(lowered: str) -> str | None:
+    unit_pattern = "|".join(sorted(UNIT_TERMS, key=len, reverse=True))
+    match = re.search(rf"\b(?:unit|in)\s*(?:is|to|=)?\s*({unit_pattern})\b", lowered)
+    return match.group(1) if match else None
+
+
+def _extract_named_value(text: str, labels: list[str]) -> str | None:
+    label_pattern = "|".join(re.escape(label) for label in labels)
+    match = re.search(
+        rf"\b(?:{label_pattern})\s*(?:is|to|=|:)?\s*([A-Za-z0-9][A-Za-z0-9 /-]{{1,80}})",
+        text,
+        flags=re.IGNORECASE,
+    )
+    if not match:
+        return None
+    value = re.split(r"\b(?:and|with|qty|quantity|unit|location|area)\b", match.group(1), flags=re.IGNORECASE)[0]
+    return value.strip(" .,!") or None
+
+
+def _extract_location(text: str) -> str | None:
+    patterns = [
+        r"((?:Tower|Block)\s+[A-Z0-9]+(?:\s+Floor\s+\d+)?)",
+        r"(Floor\s+\d+)",
+        r"(Basement(?:\s+\d+)?)",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, text, flags=re.IGNORECASE)
+        if match:
+            return match.group(1).strip()
+    return None
+
+
+def _extract_trade_counts(lowered: str) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for trade in TRADE_TERMS:
+        match = re.search(rf"\b(?:{re.escape(trade)}s?)\s*(?:is|to|=)?\s*(\d+)\b", lowered)
+        if not match:
+            match = re.search(rf"\b(\d+)\s+{re.escape(trade)}s?\b", lowered)
+        if match:
+            count_group = 1 if match.lastindex == 1 else 1
+            counts[trade] = int(match.group(count_group))
+    return counts
+
+
+def _build_corrected_confirmation_prompt(intent: str, pending_data: dict) -> str:
+    return (
+        f"I have updated the {intent.replace('_', ' ')} entry:\n"
+        f"{_summarize_pending_data(pending_data)}\n\n"
+        "Please reply Yes to save this corrected entry, or tell me what else to change."
+    )
+
+
+def _summarize_pending_data(pending_data: dict) -> str:
+    details = []
+    for key, value in pending_data.items():
+        if key == "original_text" or value in [None, {}, []]:
+            continue
+        if isinstance(value, dict):
+            nested = ", ".join(f"{nested_key}: {nested_value}" for nested_key, nested_value in value.items())
+            details.append(f"{key.replace('_', ' ')}: {nested}")
+        else:
+            details.append(f"{key.replace('_', ' ')}: {value}")
+    return "; ".join(details) if details else "No structured details found yet."
 
 
 def _resolve_single_project_for_user(db: Session, user: User) -> Project | None:
