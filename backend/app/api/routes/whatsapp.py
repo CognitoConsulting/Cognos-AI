@@ -1,3 +1,4 @@
+from datetime import timedelta
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -16,8 +17,11 @@ from app.models import (
     AssistantParseResult,
     Company,
     MediaFile,
+    ManpowerEntry,
+    MaterialTransaction,
     Project,
     ProjectUser,
+    ProgressEntry,
     User,
     WhatsAppMessage,
     WhatsAppProviderAccount,
@@ -541,13 +545,14 @@ def _save_inbound_media_if_possible(
         }
 
     project = projects[0]
+    link_target = _find_latest_linkable_entry(db, user, project, message)
     media_file = MediaFile(
         company_id=project.company_id,
         project_id=project.id,
         uploaded_by=user.id,
         source_whatsapp_message_id=message.id,
-        linked_entity_type="whatsapp_message",
-        linked_entity_id=message.id,
+        linked_entity_type=link_target["entity_type"] if link_target else "whatsapp_message",
+        linked_entity_id=link_target["entity_id"] if link_target else message.id,
         media_type=normalized.media_type,
         storage_url=_media_storage_url(normalized),
         file_name=normalized.media_file_name,
@@ -557,13 +562,17 @@ def _save_inbound_media_if_possible(
         captured_at=message.received_at,
     )
     db.add(media_file)
+    _mark_linked_entry_has_proof(link_target)
+    link_text = (
+        f" and linked it to the latest {link_target['label']} entry"
+        if link_target
+        else ""
+    )
     return {
         "processing_status": "media_stored",
         "detail": "Inbound WhatsApp media was stored as a project media/proof record.",
         "reply_text": (
-            f"Received and stored this {normalized.media_type} proof for {project.name}. "
-            "If it belongs to a specific activity/material entry, linking will be added in the "
-            "next workflow."
+            f"Received and stored this {normalized.media_type} proof for {project.name}{link_text}."
         ),
     }
 
@@ -620,7 +629,10 @@ def _save_pending_media_project_selection_reply(
     return {
         "processing_status": "media_project_selected",
         "detail": "Media project selection received and image/proof stored.",
-        "reply_text": f"Received. I stored the image/proof for {project.name}.",
+        "reply_text": (
+            f"Received. I stored the image/proof for {project.name}"
+            f"{_media_link_reply_suffix(media_file)}."
+        ),
     }
 
 
@@ -649,13 +661,14 @@ def _create_media_file_from_pending_message(
     project: Project,
 ) -> MediaFile:
     media_payload = (pending_media_message.raw_provider_payload or {}).get("_cognos_media") or {}
+    link_target = _find_latest_linkable_entry(db, user, project, pending_media_message)
     media_file = MediaFile(
         company_id=project.company_id,
         project_id=project.id,
         uploaded_by=user.id,
         source_whatsapp_message_id=pending_media_message.id,
-        linked_entity_type="whatsapp_message",
-        linked_entity_id=pending_media_message.id,
+        linked_entity_type=link_target["entity_type"] if link_target else "whatsapp_message",
+        linked_entity_id=link_target["entity_id"] if link_target else pending_media_message.id,
         media_type=media_payload.get("media_type") or "image",
         storage_url=_media_storage_url_from_payload(
             pending_media_message.provider_name,
@@ -668,8 +681,126 @@ def _create_media_file_from_pending_message(
         captured_at=pending_media_message.received_at,
     )
     db.add(media_file)
+    _mark_linked_entry_has_proof(link_target)
     db.flush()
     return media_file
+
+
+def _find_latest_linkable_entry(
+    db: Session,
+    user: User,
+    project: Project,
+    media_message: WhatsAppMessage,
+) -> dict | None:
+    if not media_message.received_at:
+        return None
+
+    cutoff = media_message.received_at - timedelta(minutes=30)
+    candidates = [
+        _latest_progress_entry(db, user, project, cutoff, media_message.received_at),
+        _latest_manpower_entry(db, user, project, cutoff, media_message.received_at),
+        _latest_material_transaction(db, user, project, cutoff, media_message.received_at),
+    ]
+    candidates = [candidate for candidate in candidates if candidate]
+    if not candidates:
+        return None
+    return max(candidates, key=lambda candidate: candidate["created_at"])
+
+
+def _latest_progress_entry(
+    db: Session,
+    user: User,
+    project: Project,
+    cutoff,
+    received_at,
+) -> dict | None:
+    entry = db.scalar(
+        select(ProgressEntry)
+        .where(ProgressEntry.company_id == project.company_id)
+        .where(ProgressEntry.project_id == project.id)
+        .where(ProgressEntry.entered_by == user.id)
+        .where(ProgressEntry.created_at >= cutoff)
+        .where(ProgressEntry.created_at <= received_at)
+        .order_by(ProgressEntry.created_at.desc())
+    )
+    if not entry:
+        return None
+    return {
+        "entity": entry,
+        "entity_type": "progress_entry",
+        "entity_id": entry.id,
+        "label": "progress",
+        "created_at": entry.created_at,
+    }
+
+
+def _latest_manpower_entry(
+    db: Session,
+    user: User,
+    project: Project,
+    cutoff,
+    received_at,
+) -> dict | None:
+    entry = db.scalar(
+        select(ManpowerEntry)
+        .where(ManpowerEntry.company_id == project.company_id)
+        .where(ManpowerEntry.project_id == project.id)
+        .where(ManpowerEntry.entered_by == user.id)
+        .where(ManpowerEntry.created_at >= cutoff)
+        .where(ManpowerEntry.created_at <= received_at)
+        .order_by(ManpowerEntry.created_at.desc())
+    )
+    if not entry:
+        return None
+    return {
+        "entity": entry,
+        "entity_type": "manpower_entry",
+        "entity_id": entry.id,
+        "label": "manpower",
+        "created_at": entry.created_at,
+    }
+
+
+def _latest_material_transaction(
+    db: Session,
+    user: User,
+    project: Project,
+    cutoff,
+    received_at,
+) -> dict | None:
+    entry = db.scalar(
+        select(MaterialTransaction)
+        .where(MaterialTransaction.company_id == project.company_id)
+        .where(MaterialTransaction.project_id == project.id)
+        .where(MaterialTransaction.entered_by == user.id)
+        .where(MaterialTransaction.created_at >= cutoff)
+        .where(MaterialTransaction.created_at <= received_at)
+        .order_by(MaterialTransaction.created_at.desc())
+    )
+    if not entry:
+        return None
+    return {
+        "entity": entry,
+        "entity_type": "material_transaction",
+        "entity_id": entry.id,
+        "label": "material",
+        "created_at": entry.created_at,
+    }
+
+
+def _mark_linked_entry_has_proof(link_target: dict | None) -> None:
+    if not link_target or link_target["entity_type"] != "material_transaction":
+        return
+    link_target["entity"].proof_status = "attached"
+
+
+def _media_link_reply_suffix(media_file: MediaFile) -> str:
+    labels = {
+        "progress_entry": " and linked it to the latest progress entry",
+        "manpower_entry": " and linked it to the latest manpower entry",
+        "material_transaction": " and linked it to the latest material entry",
+    }
+    return labels.get(media_file.linked_entity_type or "", "")
 
 
 def _media_storage_url_from_payload(provider_name: str, media_payload: dict) -> str:

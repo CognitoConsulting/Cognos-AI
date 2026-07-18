@@ -114,6 +114,8 @@ It normalizes inbound provider payloads and stores them in `whatsapp_messages`.
 
 For image/proof messages, the webhook can create `media_files` records when the sender belongs to exactly one active project. If the sender belongs to multiple projects, the system asks for the project name/code and can use the next text reply to link the pending image/proof to the selected project.
 
+When a photo/proof arrives within 30 minutes of the same user's latest saved progress, manpower, or material entry for that project, the media record is linked to that entry. Material transactions also move from `not_attached` to `attached` proof status.
+
 This media foundation stores the supplied media URL or provider media reference. It does not yet download provider media into long-term object storage.
 
 The webhook also creates a first parser result in `assistant_parse_results`.

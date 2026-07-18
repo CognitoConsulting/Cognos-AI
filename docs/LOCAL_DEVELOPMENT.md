@@ -347,6 +347,8 @@ curl -X POST http://localhost:8000/webhooks/whatsapp/generic \
 
 If the sender belongs to exactly one active project, the image/proof payload is stored in `media_files` and appears in the dashboard media/proof table.
 
+If the sender recently saved a progress, manpower, or material entry in that project, the image/proof is automatically linked to the latest entry from the same user within 30 minutes. Material entries also move to `attached` proof status.
+
 If the sender has multiple active projects, the system records the WhatsApp message but asks for project context instead of guessing. The user can then reply with the project name or code:
 
 ```bash
@@ -355,7 +357,7 @@ curl -X POST http://localhost:8000/webhooks/whatsapp/generic \
   -d "{\"message_id\":\"image-proof-project-001\",\"phone\":\"+919999999999\",\"message_text\":\"GR-001\",\"provider_account_id\":\"local-test-account\"}"
 ```
 
-If the project reply matches one active project available to that user, the pending image/proof is stored in `media_files`.
+If the project reply matches one active project available to that user, the pending image/proof is stored in `media_files` and can also auto-link to that user's latest recent saved entry in the selected project.
 
 If you run the same webhook test repeatedly, change the `message_id` in the sample file.
 

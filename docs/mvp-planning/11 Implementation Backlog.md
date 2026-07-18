@@ -578,6 +578,8 @@ Acceptance criteria:
 - first foundation stores generic/Meta image references in `media_files` for single-project users
 - system asks for project name/code when the sender has multiple active projects
 - next project name/code reply can link the pending image/proof to the selected project
+- media can auto-link to the same user's latest recent progress, manpower, or material entry
+- material proof status is marked attached when media links to a material transaction
 - caption is processed if present
 - if caption is missing, assistant asks what the image relates to
 - downloading provider media into long-term object storage is still future work
