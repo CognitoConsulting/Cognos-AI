@@ -61,6 +61,7 @@ The first foundation APIs allow platform-admin setup of:
 - WhatsApp image/proof capture into `media_files` for users with one active project
 - WhatsApp voice-note capture into `voice_notes`, with provider-supplied transcripts processed like text
 - OpenAI transcription adapter for supported downloadable voice/audio files
+- Meta WhatsApp media-ID URL resolution for inbound media/voice references
 - first confirmed-save workflow from WhatsApp confirmation replies into reporting records
 - first correction workflow before confirmation-save
 - first missing-information follow-up workflow before confirmation-save
@@ -124,6 +125,22 @@ For voice notes, the webhook creates a `voice_notes` audit record. If the inboun
 
 If `VOICE_TRANSCRIPTION_ENABLED=true`, `VOICE_TRANSCRIPTION_PROVIDER=openai`, and the correct OpenAI key is available, the backend can download supported audio files and send them to OpenAI's Audio Transcriptions API. The default model is `gpt-4o-mini-transcribe`.
 
+For Meta WhatsApp Cloud API payloads that contain only a media ID, the backend can now resolve that media ID into a short-lived downloadable media URL before attempting transcription. This follows the Meta media flow: media ID -> media URL -> media download.
+
+Meta media download uses runtime secrets only. Set either:
+
+```text
+META_WHATSAPP_ACCESS_TOKEN
+```
+
+or a phone/account-specific token:
+
+```text
+META_WHATSAPP_ACCESS_TOKEN_<PHONE_NUMBER_ID_OR_PROVIDER_ACCOUNT_ID>
+```
+
+The resolved Meta media URL is treated as runtime-only. It is not stored permanently in `media_files`, `voice_notes`, or the Cognos audit payload because Meta media URLs are short-lived and should be treated as sensitive.
+
 Platform-managed AI mode uses `OPENAI_API_KEY`.
 
 Company-owned AI mode does not store raw keys in the database. For local/pilot testing, provide the key as:
@@ -138,7 +155,7 @@ Example:
 COGNOS_COMPANY_OPENAI_API_KEY_11111111_1111_1111_1111_111111111111
 ```
 
-The current adapter supports downloadable files in OpenAI-supported formats such as flac, mp3, mp4, mpeg, mpga, m4a, ogg, wav, and webm. If the selected WhatsApp provider sends only a media ID instead of a downloadable URL, provider-specific media download still needs to be added.
+The current adapter supports downloadable files in OpenAI-supported formats such as flac, mp3, mp4, mpeg, mpga, m4a, ogg, wav, and webm. Long-term object storage for downloaded media is still future work.
 
 The webhook also creates a first parser result in `assistant_parse_results`.
 It now creates a conversation state in `assistant_conversation_states` so the next step is visible:
