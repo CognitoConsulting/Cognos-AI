@@ -600,6 +600,38 @@ td {
   color: #344054;
 }
 
+.media-action-cell {
+  display: grid;
+  gap: 8px;
+  min-width: 220px;
+}
+
+.media-action-cell > span {
+  color: #344054;
+  font-weight: 700;
+}
+
+.media-action-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.media-action-buttons button {
+  border-radius: 999px;
+  font-size: 12px;
+  padding: 7px 10px;
+}
+
+.media-action-buttons button:last-child {
+  background: #f2f4f7;
+  color: #344054;
+}
+
+.media-action-buttons button:last-child:hover {
+  background: #e4e7ec;
+}
+
 .bar-track {
   background: #eaecf0;
   border-radius: 999px;
