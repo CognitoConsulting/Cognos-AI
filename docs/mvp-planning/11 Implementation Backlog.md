@@ -597,6 +597,7 @@ Acceptance criteria:
 - first local storage adapter persists downloaded image/proof files before saving the media record
 - stored image/proof files can be opened through a permission-checked backend access endpoint
 - dashboard users with media access can open/download stored image/proof files from the project view
+- dashboard users can browse project image/proof files in a gallery-style card view with date, status, and linked-record context
 - caption is processed if present
 - if caption is missing, assistant asks what the image relates to
 - downloading provider media into long-term object storage is still future work
