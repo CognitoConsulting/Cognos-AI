@@ -496,6 +496,38 @@ Supported simple confirmation replies include:
 
 Supported early correction replies include simple quantity, unit, location, activity, material, and manpower-trade changes such as `change quantity to 60`, `unit is bags`, or `mason to 5`.
 
+## Assistant missing-information follow-up example
+
+If the first WhatsApp update is incomplete, the assistant asks only for what is missing.
+
+1. Send an incomplete update:
+
+```bash
+curl -X POST http://localhost:8000/webhooks/whatsapp/generic \
+  -H "Content-Type: application/json" \
+  -d "{\"message_id\":\"material-missing-001\",\"phone\":\"+919999999999\",\"message_text\":\"cement received\",\"provider_account_id\":\"local-test-account\"}"
+```
+
+2. Reply with only the missing quantity and unit:
+
+```bash
+curl -X POST http://localhost:8000/webhooks/whatsapp/generic \
+  -H "Content-Type: application/json" \
+  -d "{\"message_id\":\"material-missing-002\",\"phone\":\"+919999999999\",\"message_text\":\"50 bags\",\"provider_account_id\":\"local-test-account\"}"
+```
+
+The assistant should complete the pending material received draft and ask for confirmation.
+
+3. Confirm:
+
+```bash
+curl -X POST http://localhost:8000/webhooks/whatsapp/generic \
+  -H "Content-Type: application/json" \
+  -d "{\"message_id\":\"material-missing-003\",\"phone\":\"+919999999999\",\"message_text\":\"Yes\",\"provider_account_id\":\"local-test-account\"}"
+```
+
+Supported missing-information replies include simple quantity/unit, location, material, activity, and manpower-trade details.
+
 If the user belongs to multiple possible projects, the system will not guess.
 It marks the conversation as needing project selection.
 The next message from the same user can be the project name or project code, for example:
