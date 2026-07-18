@@ -15,6 +15,9 @@ from app.models import (
     AssistantConversationState,
     AssistantParseResult,
     Company,
+    MediaFile,
+    Project,
+    ProjectUser,
     User,
     WhatsAppMessage,
     WhatsAppProviderAccount,
@@ -237,7 +240,12 @@ async def receive_whatsapp_webhook(
         provider_name=normalized.provider_name,
         provider_message_id=normalized.provider_message_id,
         provider_account_id=normalized.provider_account_id,
-        raw_provider_payload=normalized.raw_payload,
+        raw_provider_payload={
+            **normalized.raw_payload,
+            "_cognos_media": _normalized_media_audit_payload(normalized),
+        }
+        if normalized.media_type
+        else normalized.raw_payload,
         processing_status=processing_status,
     )
     db.add(message)
@@ -281,6 +289,24 @@ async def receive_whatsapp_webhook(
             message_id=message.id,
             processing_status=message.processing_status,
             detail="Inbound WhatsApp message stored, but the user phone number is unknown.",
+        )
+
+    media_result = _save_inbound_media_if_possible(db, user, message, normalized)
+    if media_result:
+        message.processing_status = media_result["processing_status"]
+        _queue_assistant_reply(
+            db,
+            message,
+            media_result["reply_text"],
+            reason="assistant_media_capture",
+        )
+        db.commit()
+        db.refresh(message)
+        return WhatsAppWebhookAccepted(
+            status="accepted",
+            message_id=message.id,
+            processing_status=message.processing_status,
+            detail=media_result["detail"],
         )
 
     project_selection_result = save_project_selection_reply(
@@ -462,6 +488,104 @@ def _queue_assistant_reply(
         provider_name=inbound_message.provider_name,
         provider_account_id=inbound_message.provider_account_id,
         reason=reason,
+    )
+
+
+def _save_inbound_media_if_possible(
+    db: Session,
+    user: User,
+    message: WhatsAppMessage,
+    normalized,
+) -> dict[str, str] | None:
+    if not normalized.media_type:
+        return None
+
+    projects = _projects_available_to_user(db, user)
+    if len(projects) == 0:
+        return {
+            "processing_status": "media_no_active_project",
+            "detail": "Inbound media was received, but the user has no active project.",
+            "reply_text": (
+                "I received your image/proof, but I could not find an active project for your "
+                "user. Please ask your company admin to assign you to a project."
+            ),
+        }
+
+    if len(projects) > 1:
+        return {
+            "processing_status": "media_needs_project",
+            "detail": "Inbound media was received, but project selection is required.",
+            "reply_text": (
+                "I received your image/proof, but I need to know which project it belongs to. "
+                "Please resend it with the project name/code for now. Automatic photo project "
+                "selection is the next workflow."
+            ),
+        }
+
+    project = projects[0]
+    media_file = MediaFile(
+        company_id=project.company_id,
+        project_id=project.id,
+        uploaded_by=user.id,
+        source_whatsapp_message_id=message.id,
+        linked_entity_type="whatsapp_message",
+        linked_entity_id=message.id,
+        media_type=normalized.media_type,
+        storage_url=_media_storage_url(normalized),
+        file_name=normalized.media_file_name,
+        caption=normalized.media_caption or message.message_text,
+        provider_media_id=normalized.provider_media_id,
+        processing_status="stored" if normalized.media_url else "provider_reference",
+        captured_at=message.received_at,
+    )
+    db.add(media_file)
+    return {
+        "processing_status": "media_stored",
+        "detail": "Inbound WhatsApp media was stored as a project media/proof record.",
+        "reply_text": (
+            f"Received and stored this {normalized.media_type} proof for {project.name}. "
+            "If it belongs to a specific activity/material entry, linking will be added in the "
+            "next workflow."
+        ),
+    }
+
+
+def _media_storage_url(normalized) -> str:
+    if normalized.media_url:
+        return normalized.media_url
+    return f"provider://{normalized.provider_name}/{normalized.provider_media_id or 'media'}"
+
+
+def _normalized_media_audit_payload(normalized) -> dict[str, str | None]:
+    return {
+        "media_type": normalized.media_type,
+        "media_url": normalized.media_url,
+        "media_file_name": normalized.media_file_name,
+        "provider_media_id": normalized.provider_media_id,
+        "media_caption": normalized.media_caption,
+    }
+
+
+def _projects_available_to_user(db: Session, user: User) -> list[Project]:
+    if user.role in {"owner", "admin", "company_admin"}:
+        return list(
+            db.scalars(
+                select(Project)
+                .where(Project.company_id == user.company_id)
+                .where(Project.status == "active")
+                .order_by(Project.created_at.desc())
+            ).all()
+        )
+
+    return list(
+        db.scalars(
+            select(Project)
+            .join(ProjectUser, ProjectUser.project_id == Project.id)
+            .where(Project.company_id == user.company_id)
+            .where(Project.status == "active")
+            .where(ProjectUser.user_id == user.id)
+            .order_by(Project.created_at.desc())
+        ).all()
     )
 
 

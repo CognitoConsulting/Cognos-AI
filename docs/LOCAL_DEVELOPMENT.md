@@ -337,6 +337,16 @@ curl -X POST http://localhost:8000/webhooks/whatsapp/generic \
   -d @docs/examples/whatsapp-generic-message.json
 ```
 
+Send a generic image/proof webhook:
+
+```bash
+curl -X POST http://localhost:8000/webhooks/whatsapp/generic \
+  -H "Content-Type: application/json" \
+  -d @docs/examples/whatsapp-generic-image.json
+```
+
+If the sender belongs to exactly one active project, the image/proof payload is stored in `media_files` and appears in the dashboard media/proof table. If the sender has multiple active projects, the system records the WhatsApp message but asks for clearer project context instead of guessing.
+
 If you run the same webhook test repeatedly, change the `message_id` in the sample file.
 
 The system treats repeated provider message IDs as duplicates, which is intentional.

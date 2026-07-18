@@ -17,6 +17,11 @@ class NormalizedInboundMessage:
     provider_account_id: str | None
     phone: str | None
     message_text: str | None
+    media_type: str | None
+    media_url: str | None
+    media_file_name: str | None
+    provider_media_id: str | None
+    media_caption: str | None
     raw_payload: dict[str, Any]
 
 
@@ -164,8 +169,31 @@ def _normalize_generic_payload(
         payload.get("phone_number_id"),
         payload.get("account_id"),
     )
+    media_type = _first_text(
+        payload.get("media_type"),
+        payload.get("type") if payload.get("type") in {"image", "photo", "video", "document"} else None,
+    )
+    media_url = _first_text(
+        payload.get("media_url"),
+        payload.get("storage_url"),
+        payload.get("url"),
+        payload.get("image_url"),
+    )
+    provider_media_id = _first_text(
+        payload.get("provider_media_id"),
+        payload.get("media_id"),
+        payload.get("image_id"),
+    )
+    media_caption = _first_text(
+        payload.get("caption"),
+        payload.get("media_caption"),
+    )
+    media_file_name = _first_text(
+        payload.get("file_name"),
+        payload.get("filename"),
+    )
 
-    if not any([message_text, phone, provider_message_id]):
+    if not any([message_text, phone, provider_message_id, media_url, provider_media_id]):
         return None
 
     return NormalizedInboundMessage(
@@ -174,6 +202,11 @@ def _normalize_generic_payload(
         provider_account_id=provider_account_id,
         phone=phone,
         message_text=message_text,
+        media_type=_normalize_media_type(media_type, media_url, provider_media_id),
+        media_url=media_url,
+        media_file_name=media_file_name,
+        provider_media_id=provider_media_id,
+        media_caption=media_caption,
         raw_payload=payload,
     )
 
@@ -202,10 +235,22 @@ def _normalize_meta_payload(
     message = messages[0]
     message_type = message.get("type")
     text_body = None
+    media_type = None
+    media_url = None
+    provider_media_id = None
+    media_caption = None
+    media_file_name = None
     if message_type == "text":
         text_body = (message.get("text") or {}).get("body")
     elif message_type in {"button", "interactive"}:
         text_body = _extract_interactive_text(message)
+    elif message_type in {"image", "video", "document"}:
+        media_payload = message.get(message_type) or {}
+        media_type = message_type
+        provider_media_id = _first_text(media_payload.get("id"))
+        media_caption = _first_text(media_payload.get("caption"))
+        media_file_name = _first_text(media_payload.get("filename"))
+        media_url = _first_text(media_payload.get("link"), media_payload.get("url"))
 
     return NormalizedInboundMessage(
         provider_name=_normalize_provider_name(provider_name),
@@ -213,6 +258,11 @@ def _normalize_meta_payload(
         provider_account_id=provider_account_id,
         phone=_first_text(message.get("from")),
         message_text=_first_text(text_body),
+        media_type=_normalize_media_type(media_type, media_url, provider_media_id),
+        media_url=media_url,
+        media_file_name=media_file_name,
+        provider_media_id=provider_media_id,
+        media_caption=media_caption,
         raw_payload=payload,
     )
 
@@ -283,3 +333,16 @@ def _select_outbound_account(
 
 def _normalize_provider_name(provider_name: str) -> str:
     return provider_name.strip().lower().replace("-", "_")
+
+
+def _normalize_media_type(
+    media_type: str | None,
+    media_url: str | None,
+    provider_media_id: str | None,
+) -> str | None:
+    if media_type:
+        normalized = media_type.strip().lower().replace("-", "_")
+        return "image" if normalized == "photo" else normalized
+    if media_url or provider_media_id:
+        return "image"
+    return None
