@@ -576,7 +576,8 @@ Acceptance criteria:
 - final production image binary is stored in object storage
 - image is linked to project, user, and timestamp
 - first foundation stores generic/Meta image references in `media_files` for single-project users
-- system does not guess the project when the sender has multiple active projects
+- system asks for project name/code when the sender has multiple active projects
+- next project name/code reply can link the pending image/proof to the selected project
 - caption is processed if present
 - if caption is missing, assistant asks what the image relates to
 - downloading provider media into long-term object storage is still future work
