@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
 
 const PLATFORM_ADMIN_TOKEN = "local-dev-platform-admin-token";
 const ACCESS_TOKEN_STORAGE_KEY = "cognos_ai_access_token";
@@ -446,6 +446,8 @@ export function App() {
   const [dailySummaryErrorMessage, setDailySummaryErrorMessage] = useState("");
   const [whatsAppMessage, setWhatsAppMessage] = useState("");
   const [whatsAppErrorMessage, setWhatsAppErrorMessage] = useState("");
+  const [mediaAccessMessage, setMediaAccessMessage] = useState("");
+  const [mediaAccessErrorMessage, setMediaAccessErrorMessage] = useState("");
   const [assistantMessage, setAssistantMessage] = useState("");
   const [assistantErrorMessage, setAssistantErrorMessage] = useState("");
   const [aiConfigurationMessage, setAiConfigurationMessage] = useState("");
@@ -931,6 +933,94 @@ export function App() {
     }
   }
 
+  async function handleOpenProjectMedia(mediaFile: MediaFile) {
+    if (!selectedCompanyId || !selectedProjectId) {
+      return;
+    }
+
+    setMediaAccessMessage("");
+    setMediaAccessErrorMessage("");
+    try {
+      await openAuthenticatedMedia(
+        `/api/companies/${selectedCompanyId}/projects/${selectedProjectId}/reporting/media-files/${mediaFile.id}/access`,
+        accessToken,
+        mediaFileDisplayName(mediaFile),
+        "open",
+      );
+      setMediaAccessMessage(`Opened ${mediaFileDisplayName(mediaFile)}.`);
+    } catch (error) {
+      setMediaAccessErrorMessage(
+        error instanceof Error ? error.message : "Could not open the media file.",
+      );
+    }
+  }
+
+  async function handleDownloadProjectMedia(mediaFile: MediaFile) {
+    if (!selectedCompanyId || !selectedProjectId) {
+      return;
+    }
+
+    setMediaAccessMessage("");
+    setMediaAccessErrorMessage("");
+    try {
+      await openAuthenticatedMedia(
+        `/api/companies/${selectedCompanyId}/projects/${selectedProjectId}/reporting/media-files/${mediaFile.id}/access`,
+        accessToken,
+        mediaFileDisplayName(mediaFile),
+        "download",
+      );
+      setMediaAccessMessage(`Downloaded ${mediaFileDisplayName(mediaFile)}.`);
+    } catch (error) {
+      setMediaAccessErrorMessage(
+        error instanceof Error ? error.message : "Could not download the media file.",
+      );
+    }
+  }
+
+  async function handleOpenVoiceNote(voiceNote: VoiceNote) {
+    if (!selectedCompanyId) {
+      return;
+    }
+
+    setWhatsAppMessage("");
+    setWhatsAppErrorMessage("");
+    try {
+      await openAuthenticatedMedia(
+        `/api/companies/${selectedCompanyId}/whatsapp/voice-notes/${voiceNote.id}/access`,
+        accessToken,
+        voiceNoteDisplayName(voiceNote),
+        "open",
+      );
+      setWhatsAppMessage(`Opened ${voiceNoteDisplayName(voiceNote)}.`);
+    } catch (error) {
+      setWhatsAppErrorMessage(
+        error instanceof Error ? error.message : "Could not open the voice note.",
+      );
+    }
+  }
+
+  async function handleDownloadVoiceNote(voiceNote: VoiceNote) {
+    if (!selectedCompanyId) {
+      return;
+    }
+
+    setWhatsAppMessage("");
+    setWhatsAppErrorMessage("");
+    try {
+      await openAuthenticatedMedia(
+        `/api/companies/${selectedCompanyId}/whatsapp/voice-notes/${voiceNote.id}/access`,
+        accessToken,
+        voiceNoteDisplayName(voiceNote),
+        "download",
+      );
+      setWhatsAppMessage(`Downloaded ${voiceNoteDisplayName(voiceNote)}.`);
+    } catch (error) {
+      setWhatsAppErrorMessage(
+        error instanceof Error ? error.message : "Could not download the voice note.",
+      );
+    }
+  }
+
   async function handleRefreshAssistantAudit() {
     if (!selectedCompanyId) {
       return;
@@ -1229,6 +1319,8 @@ export function App() {
             onProviderFormChange={setWhatsAppProviderForm}
             onCreateProviderAccount={handleCreateWhatsAppProviderAccount}
             onRefresh={handleRefreshWhatsAppMessages}
+            onOpenVoiceNote={handleOpenVoiceNote}
+            onDownloadVoiceNote={handleDownloadVoiceNote}
           />
         ) : null}
 
@@ -1429,19 +1521,29 @@ export function App() {
           ) : null}
 
           {filteredData.access.media ? (
-            <ReportingTable
-              title="Image/proof files"
-              emptyMessage="No media files yet."
-              helper="Image and proof records linked to project reporting activity."
-              columns={["Created", "Type", "File", "Linked to", "Status"]}
-              rows={filteredData.media.map((entry) => [
-                formatDateTime(entry.created_at),
-                entry.media_type,
-                entry.file_name ?? entry.caption ?? entry.storage_url,
-                formatMediaLink(entry),
-                entry.processing_status,
-              ])}
-            />
+            <div>
+              {mediaAccessMessage ? <p className="status-message">{mediaAccessMessage}</p> : null}
+              {mediaAccessErrorMessage ? (
+                <p className="error-message">{mediaAccessErrorMessage}</p>
+              ) : null}
+              <ReportingTable
+                title="Image/proof files"
+                emptyMessage="No media files yet."
+                helper="Image and proof records linked to project reporting activity."
+                columns={["Created", "Type", "File", "Linked to", "Status"]}
+                rows={filteredData.media.map((entry) => [
+                  formatDateTime(entry.created_at),
+                  entry.media_type,
+                  <MediaActionCell
+                    label={mediaFileDisplayName(entry)}
+                    onOpen={() => handleOpenProjectMedia(entry)}
+                    onDownload={() => handleDownloadProjectMedia(entry)}
+                  />,
+                  formatMediaLink(entry),
+                  entry.processing_status,
+                ])}
+              />
+            </div>
           ) : null}
         </section>
       </section>
@@ -1496,7 +1598,7 @@ function ReportingTable({
   emptyMessage: string;
   helper?: string;
   columns: string[];
-  rows: string[][];
+  rows: ReactNode[][];
 }) {
   return (
     <article className="panel table-panel">
@@ -1537,6 +1639,30 @@ function ReportingTable({
         </div>
       )}
     </article>
+  );
+}
+
+function MediaActionCell({
+  label,
+  onOpen,
+  onDownload,
+}: {
+  label: string;
+  onOpen: () => void;
+  onDownload: () => void;
+}) {
+  return (
+    <div className="media-action-cell">
+      <span title={label}>{truncateText(label, 44)}</span>
+      <div className="media-action-buttons">
+        <button type="button" onClick={onOpen}>
+          Open
+        </button>
+        <button type="button" onClick={onDownload}>
+          Download
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -2104,6 +2230,8 @@ function WhatsAppAuditPanel({
   onProviderFormChange,
   onCreateProviderAccount,
   onRefresh,
+  onOpenVoiceNote,
+  onDownloadVoiceNote,
 }: {
   providerAccounts: WhatsAppProviderAccount[];
   providerForm: typeof emptyWhatsAppProviderForm;
@@ -2114,6 +2242,8 @@ function WhatsAppAuditPanel({
   onProviderFormChange: (form: typeof emptyWhatsAppProviderForm) => void;
   onCreateProviderAccount: (event: FormEvent<HTMLFormElement>) => void;
   onRefresh: () => void;
+  onOpenVoiceNote: (voiceNote: VoiceNote) => void;
+  onDownloadVoiceNote: (voiceNote: VoiceNote) => void;
 }) {
   const auditCards = buildWhatsAppAuditCards(messages);
 
@@ -2261,7 +2391,11 @@ function WhatsAppAuditPanel({
           formatRole(voiceNote.transcription_status),
           voiceNote.transcription_provider ?? "-",
           truncateText(voiceNote.transcript_text ?? voiceNote.error_message ?? "-", 90),
-          voiceNote.file_name ?? voiceNote.provider_media_id ?? voiceNote.storage_url,
+          <MediaActionCell
+            label={voiceNoteDisplayName(voiceNote)}
+            onOpen={() => onOpenVoiceNote(voiceNote)}
+            onDownload={() => onDownloadVoiceNote(voiceNote)}
+          />,
         ])}
       />
     </section>
@@ -2710,6 +2844,65 @@ async function importKnowledgeTemplate(
   }
 
   return response.json() as Promise<KnowledgeTemplateImportResult>;
+}
+
+async function openAuthenticatedMedia(
+  path: string,
+  accessToken: string,
+  fileName: string,
+  action: "open" | "download",
+): Promise<void> {
+  let pendingWindow: Window | null = null;
+  if (action === "open") {
+    pendingWindow = window.open("", "_blank");
+    if (pendingWindow) {
+      pendingWindow.opener = null;
+      pendingWindow.document.title = "Opening media";
+      pendingWindow.document.body.textContent = "Opening media...";
+    }
+  }
+
+  try {
+    const response = await fetch(path, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new ApiRequestError(response.status, await errorDetail(response));
+    }
+
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+
+    if (action === "download") {
+      triggerBrowserDownload(url, fileName);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      return;
+    }
+
+    if (pendingWindow && !pendingWindow.closed) {
+      pendingWindow.location.href = url;
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      return;
+    }
+
+    triggerBrowserDownload(url, fileName);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch (error) {
+    if (pendingWindow && !pendingWindow.closed) {
+      pendingWindow.close();
+    }
+    throw error;
+  }
+}
+
+function triggerBrowserDownload(url: string, fileName: string) {
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = safeMediaFileName(fileName || "cognos-ai-media");
+  link.click();
 }
 
 async function loadCompanyUsers(companyId: string, accessToken: string): Promise<CompanyUser[]> {
@@ -3640,6 +3833,33 @@ function xmlEscape(value: string): string {
 
 function safeSheetName(name: string): string {
   return name.replace(/[\[\]:*?/\\]/g, " ").slice(0, 31) || "Sheet";
+}
+
+function mediaFileDisplayName(entry: MediaFile): string {
+  return (
+    entry.file_name?.trim() ||
+    entry.caption?.trim() ||
+    `${entry.media_type || "media"}-${entry.id}`
+  );
+}
+
+function voiceNoteDisplayName(entry: VoiceNote): string {
+  return (
+    entry.file_name?.trim() ||
+    entry.provider_media_id?.trim() ||
+    `voice-note-${entry.id}`
+  );
+}
+
+function safeMediaFileName(name: string): string {
+  return (
+    name
+      .trim()
+      .replace(/[<>:"/\\|?*\x00-\x1F]+/g, "-")
+      .replace(/\s+/g, " ")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 180) || "cognos-ai-media"
+  );
 }
 
 function safeFileName(name: string): string {
