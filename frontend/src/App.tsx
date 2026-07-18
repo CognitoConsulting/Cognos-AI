@@ -1526,22 +1526,11 @@ export function App() {
               {mediaAccessErrorMessage ? (
                 <p className="error-message">{mediaAccessErrorMessage}</p>
               ) : null}
-              <ReportingTable
-                title="Image/proof files"
+              <MediaGallery
+                mediaFiles={filteredData.media}
                 emptyMessage="No media files yet."
-                helper="Image and proof records linked to project reporting activity."
-                columns={["Created", "Type", "File", "Linked to", "Status"]}
-                rows={filteredData.media.map((entry) => [
-                  formatDateTime(entry.created_at),
-                  entry.media_type,
-                  <MediaActionCell
-                    label={mediaFileDisplayName(entry)}
-                    onOpen={() => handleOpenProjectMedia(entry)}
-                    onDownload={() => handleDownloadProjectMedia(entry)}
-                  />,
-                  formatMediaLink(entry),
-                  entry.processing_status,
-                ])}
+                onOpen={handleOpenProjectMedia}
+                onDownload={handleDownloadProjectMedia}
               />
             </div>
           ) : null}
@@ -1636,6 +1625,73 @@ function ReportingTable({
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+    </article>
+  );
+}
+
+function MediaGallery({
+  mediaFiles,
+  emptyMessage,
+  onOpen,
+  onDownload,
+}: {
+  mediaFiles: MediaFile[];
+  emptyMessage: string;
+  onOpen: (mediaFile: MediaFile) => void;
+  onDownload: (mediaFile: MediaFile) => void;
+}) {
+  return (
+    <article className="panel table-panel media-gallery-panel">
+      <div className="table-title-row">
+        <div>
+          <h3>Image/proof gallery</h3>
+          <p>Browse stored site photos and proof files linked to project reporting activity.</p>
+        </div>
+        <span>
+          {mediaFiles.length} {mediaFiles.length === 1 ? "file" : "files"}
+        </span>
+      </div>
+      {mediaFiles.length === 0 ? (
+        <div className="empty-state">
+          <strong>No records found</strong>
+          <p>{emptyMessage}</p>
+        </div>
+      ) : (
+        <div className="media-gallery-grid">
+          {mediaFiles.map((mediaFile) => (
+            <article className="media-proof-card" key={mediaFile.id}>
+              <div className="media-proof-preview" aria-hidden="true">
+                <span>{mediaTypeShortLabel(mediaFile.media_type)}</span>
+              </div>
+              <div className="media-proof-content">
+                <div className="media-proof-header">
+                  <span>{formatRole(mediaFile.media_type)}</span>
+                  <strong>{formatRole(mediaFile.processing_status)}</strong>
+                </div>
+                <h4 title={mediaFileDisplayName(mediaFile)}>
+                  {truncateText(mediaFileDisplayName(mediaFile), 56)}
+                </h4>
+                {mediaFile.caption ? <p>{truncateText(mediaFile.caption, 90)}</p> : null}
+                <dl className="media-proof-meta">
+                  <div>
+                    <dt>Created</dt>
+                    <dd>{formatDateTime(mediaFile.created_at)}</dd>
+                  </div>
+                  <div>
+                    <dt>Linked to</dt>
+                    <dd>{formatMediaLink(mediaFile)}</dd>
+                  </div>
+                </dl>
+                <MediaActionCell
+                  label={mediaFileDisplayName(mediaFile)}
+                  onOpen={() => onOpen(mediaFile)}
+                  onDownload={() => onDownload(mediaFile)}
+                />
+              </div>
+            </article>
+          ))}
         </div>
       )}
     </article>
@@ -3849,6 +3905,23 @@ function voiceNoteDisplayName(entry: VoiceNote): string {
     entry.provider_media_id?.trim() ||
     `voice-note-${entry.id}`
   );
+}
+
+function mediaTypeShortLabel(mediaType: string | null): string {
+  const normalized = (mediaType || "").toLowerCase();
+  if (normalized.includes("image")) {
+    return "IMG";
+  }
+  if (normalized.includes("video")) {
+    return "VID";
+  }
+  if (normalized.includes("audio") || normalized.includes("voice")) {
+    return "AUD";
+  }
+  if (normalized.includes("document") || normalized.includes("file")) {
+    return "DOC";
+  }
+  return "FILE";
 }
 
 function safeMediaFileName(name: string): string {

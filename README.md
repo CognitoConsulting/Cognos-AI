@@ -85,6 +85,7 @@ Current foundation includes:
 - first dashboard daily summary UI for settings, preview, manual send, and send history
 - first dashboard WhatsApp audit UI for inbound/outbound message logs and pilot debugging
 - dashboard media action buttons for opening/downloading stored proofs and voice notes
+- dashboard image/proof gallery card view for browsing project media with context
 - first dashboard WhatsApp provider settings UI for adding and reviewing provider accounts
 - first dashboard assistant audit UI for reviewing parse results, missing fields, and conversation states
 - first company AI settings API and dashboard UI for platform-managed vs company-owned AI mode
