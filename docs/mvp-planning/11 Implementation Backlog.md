@@ -504,6 +504,7 @@ Acceptance criteria:
 - original message and final structured record are both stored
 - foundation conversation state is stored after each parsed WhatsApp message
 - conversation state shows whether the assistant is waiting for confirmation, missing information, or redirecting the user professionally
+- dashboard can show assistant parse results, missing fields, and conversation states for owner/admin users
 - first confirmed-save workflow stores progress, manpower, and material records after simple replies like `Yes`, `OK`, or `haan`
 - project-selection follow-up supports users assigned to multiple active projects
 

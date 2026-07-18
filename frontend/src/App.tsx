@@ -138,6 +138,38 @@ type WhatsAppProviderAccount = {
   created_at: string;
 };
 
+type AssistantParseResult = {
+  id: string;
+  company_id: string | null;
+  user_id: string | null;
+  whatsapp_message_id: string;
+  intent: string;
+  confidence: string;
+  input_language: string | null;
+  extracted_data: Record<string, unknown>;
+  missing_fields: string[];
+  validation_status: string;
+  assistant_summary: string | null;
+  next_action: string;
+  created_at: string;
+};
+
+type AssistantConversationState = {
+  id: string;
+  company_id: string | null;
+  user_id: string | null;
+  whatsapp_message_id: string;
+  parse_result_id: string;
+  status: string;
+  pending_intent: string;
+  pending_data: Record<string, unknown>;
+  missing_fields: string[];
+  confirmation_prompt: string | null;
+  last_user_message: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 type AuthenticatedUser = {
   id: string;
   company_id: string;
@@ -255,6 +287,7 @@ const moduleDefinitions = [
   { label: "Images", id: "images" },
   { label: "Exports", id: "exports" },
   { label: "WhatsApp", id: "whatsapp" },
+  { label: "Assistant", id: "assistant" },
   { label: "Settings", id: "settings" },
 ] as const;
 
@@ -363,6 +396,10 @@ export function App() {
   const [dailySummaryMessages, setDailySummaryMessages] = useState<DailySummaryMessage[]>([]);
   const [whatsAppProviderAccounts, setWhatsAppProviderAccounts] = useState<WhatsAppProviderAccount[]>([]);
   const [whatsAppMessages, setWhatsAppMessages] = useState<WhatsAppAuditMessage[]>([]);
+  const [assistantParseResults, setAssistantParseResults] = useState<AssistantParseResult[]>([]);
+  const [assistantConversationStates, setAssistantConversationStates] = useState<
+    AssistantConversationState[]
+  >([]);
   const [dailySummaryForm, setDailySummaryForm] = useState(emptyDailySummaryForm);
   const [whatsAppProviderForm, setWhatsAppProviderForm] = useState(emptyWhatsAppProviderForm);
   const [dailySummaryDate, setDailySummaryDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -378,6 +415,8 @@ export function App() {
   const [dailySummaryErrorMessage, setDailySummaryErrorMessage] = useState("");
   const [whatsAppMessage, setWhatsAppMessage] = useState("");
   const [whatsAppErrorMessage, setWhatsAppErrorMessage] = useState("");
+  const [assistantMessage, setAssistantMessage] = useState("");
+  const [assistantErrorMessage, setAssistantErrorMessage] = useState("");
 
   useEffect(() => {
     if (!accessToken) {
@@ -546,6 +585,26 @@ export function App() {
       });
   }, [selectedCompanyId, currentUser, accessToken]);
 
+  useEffect(() => {
+    if (!selectedCompanyId || !currentUser || !isCompanyAdmin(currentUser.role)) {
+      setAssistantParseResults([]);
+      setAssistantConversationStates([]);
+      return;
+    }
+
+    loadAssistantAuditWorkspace(selectedCompanyId, accessToken)
+      .then(({ parseResults, conversationStates }) => {
+        setAssistantParseResults(parseResults);
+        setAssistantConversationStates(conversationStates);
+        setAssistantErrorMessage("");
+      })
+      .catch((error: Error) => {
+        setAssistantParseResults([]);
+        setAssistantConversationStates([]);
+        setAssistantErrorMessage(error.message);
+      });
+  }, [selectedCompanyId, currentUser, accessToken]);
+
   const filteredData = useMemo(
     () => filterReportingData(reportingData, fromDate, toDate),
     [reportingData, fromDate, toDate],
@@ -564,6 +623,7 @@ export function App() {
   const canManageKnowledgebase = currentUser ? isCompanyAdmin(currentUser.role) : false;
   const canManageDailySummary = currentUser ? isCompanyAdmin(currentUser.role) : false;
   const canViewWhatsAppAudit = currentUser ? isCompanyAdmin(currentUser.role) : false;
+  const canViewAssistantAudit = currentUser ? isCompanyAdmin(currentUser.role) : false;
   const canExportWorkbook =
     filteredData.access.progress ||
     filteredData.access.manpower ||
@@ -821,6 +881,30 @@ export function App() {
     }
   }
 
+  async function handleRefreshAssistantAudit() {
+    if (!selectedCompanyId) {
+      return;
+    }
+
+    setAssistantMessage("");
+    setAssistantErrorMessage("");
+    try {
+      const { parseResults, conversationStates } = await loadAssistantAuditWorkspace(
+        selectedCompanyId,
+        accessToken,
+      );
+      setAssistantParseResults(parseResults);
+      setAssistantConversationStates(conversationStates);
+      setAssistantMessage(
+        `Loaded ${parseResults.length} parse result(s) and ${conversationStates.length} conversation state(s).`,
+      );
+    } catch (error) {
+      setAssistantErrorMessage(
+        error instanceof Error ? error.message : "Could not load assistant audit records.",
+      );
+    }
+  }
+
   async function handleCreateWhatsAppProviderAccount(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selectedCompanyId) {
@@ -1055,6 +1139,16 @@ export function App() {
             onProviderFormChange={setWhatsAppProviderForm}
             onCreateProviderAccount={handleCreateWhatsAppProviderAccount}
             onRefresh={handleRefreshWhatsAppMessages}
+          />
+        ) : null}
+
+        {canViewAssistantAudit ? (
+          <AssistantAuditPanel
+            parseResults={assistantParseResults}
+            conversationStates={assistantConversationStates}
+            assistantMessage={assistantMessage}
+            assistantErrorMessage={assistantErrorMessage}
+            onRefresh={handleRefreshAssistantAudit}
           />
         ) : null}
 
@@ -1968,6 +2062,86 @@ function WhatsAppAuditPanel({
   );
 }
 
+function AssistantAuditPanel({
+  parseResults,
+  conversationStates,
+  assistantMessage,
+  assistantErrorMessage,
+  onRefresh,
+}: {
+  parseResults: AssistantParseResult[];
+  conversationStates: AssistantConversationState[];
+  assistantMessage: string;
+  assistantErrorMessage: string;
+  onRefresh: () => void;
+}) {
+  const auditCards = buildAssistantAuditCards(parseResults, conversationStates);
+
+  return (
+    <section className="management-section" id="assistant">
+      <div className="section-heading reporting-heading">
+        <div>
+          <p className="eyebrow">Assistant audit</p>
+          <h3>Review what the AI assistant understood</h3>
+          <p>
+            Use this during pilots to see how WhatsApp updates were interpreted, whether fields
+            were missing, and which conversations still need confirmation or cleanup.
+          </p>
+        </div>
+        <div className="button-row">
+          <button type="button" onClick={onRefresh}>
+            Refresh assistant audit
+          </button>
+        </div>
+      </div>
+
+      {assistantMessage ? <p className="status-message">{assistantMessage}</p> : null}
+      {assistantErrorMessage ? <p className="error-message">{assistantErrorMessage}</p> : null}
+
+      <section className="card-grid" aria-label="Assistant audit summary">
+        {auditCards.map((card) => (
+          <article className={`summary-card ${card.tone}`} key={card.label}>
+            <p>{card.label}</p>
+            <strong>{card.value}</strong>
+            <span>{card.helper}</span>
+          </article>
+        ))}
+      </section>
+
+      <ReportingTable
+        title="Assistant parse results"
+        emptyMessage="No assistant parse results have been stored for this company yet."
+        helper="Every row shows one WhatsApp message interpretation before it is confirmed, corrected, or saved."
+        columns={["Created", "Intent", "Confidence", "Language", "Validation", "Next action", "Summary"]}
+        rows={parseResults.map((result) => [
+          formatDateTime(result.created_at),
+          formatRole(result.intent),
+          formatConfidence(result.confidence),
+          result.input_language ? formatRole(result.input_language) : "-",
+          formatRole(result.validation_status),
+          formatRole(result.next_action),
+          truncateText(result.assistant_summary ?? summarizeObject(result.extracted_data), 100),
+        ])}
+      />
+
+      <ReportingTable
+        title="Assistant conversation states"
+        emptyMessage="No active or historical assistant conversation states have been stored yet."
+        helper="Shows follow-up conversations where the assistant asked for confirmation, missing fields, project selection, or another next step."
+        columns={["Updated", "Status", "Pending intent", "Missing fields", "Last user message", "Assistant prompt"]}
+        rows={conversationStates.map((state) => [
+          formatDateTime(state.updated_at),
+          formatRole(state.status),
+          formatRole(state.pending_intent),
+          formatMissingFields(state.missing_fields),
+          truncateText(state.last_user_message ?? "-", 80),
+          truncateText(state.confirmation_prompt ?? summarizeObject(state.pending_data), 100),
+        ])}
+      />
+    </section>
+  );
+}
+
 function TeamManagementPanel({
   users,
   assignments,
@@ -2515,6 +2689,40 @@ async function loadWhatsAppWorkspace(
   return { providerAccounts, messages };
 }
 
+async function loadAssistantParseResults(
+  companyId: string,
+  accessToken: string,
+): Promise<AssistantParseResult[]> {
+  return apiRequest<AssistantParseResult[]>(
+    `/api/companies/${companyId}/assistant/parse-results`,
+    accessToken,
+  );
+}
+
+async function loadAssistantConversationStates(
+  companyId: string,
+  accessToken: string,
+): Promise<AssistantConversationState[]> {
+  return apiRequest<AssistantConversationState[]>(
+    `/api/companies/${companyId}/assistant/conversation-states`,
+    accessToken,
+  );
+}
+
+async function loadAssistantAuditWorkspace(
+  companyId: string,
+  accessToken: string,
+): Promise<{
+  parseResults: AssistantParseResult[];
+  conversationStates: AssistantConversationState[];
+}> {
+  const [parseResults, conversationStates] = await Promise.all([
+    loadAssistantParseResults(companyId, accessToken),
+    loadAssistantConversationStates(companyId, accessToken),
+  ]);
+  return { parseResults, conversationStates };
+}
+
 async function createWhatsAppProviderAccount(
   companyId: string,
   accessToken: string,
@@ -2767,6 +2975,56 @@ function buildWhatsAppAuditCards(messages: WhatsAppAuditMessage[]): SummaryCard[
       value: String(unknownUsers + queued),
       helper: "Unknown users or queued provider sends",
       tone: unknownUsers + queued > 0 ? "rose" : "green",
+    },
+  ];
+}
+
+function buildAssistantAuditCards(
+  parseResults: AssistantParseResult[],
+  conversationStates: AssistantConversationState[],
+): SummaryCard[] {
+  const awaitingConfirmation = conversationStates.filter(
+    (state) => state.status === "awaiting_confirmation",
+  ).length;
+  const missingInformation = conversationStates.filter(
+    (state) =>
+      state.status === "awaiting_missing_information" ||
+      state.missing_fields.length > 0,
+  ).length;
+  const attentionStatuses = new Set([
+    "awaiting_project_selection",
+    "permission_denied",
+    "redirected",
+    "unsupported_intent",
+  ]);
+  const needsAttention = conversationStates.filter((state) =>
+    attentionStatuses.has(state.status),
+  ).length;
+
+  return [
+    {
+      label: "Parsed messages",
+      value: String(parseResults.length),
+      helper: "WhatsApp messages interpreted by assistant",
+      tone: "blue",
+    },
+    {
+      label: "Awaiting confirmation",
+      value: String(awaitingConfirmation),
+      helper: "Users still need to say yes/correct details",
+      tone: awaitingConfirmation > 0 ? "amber" : "green",
+    },
+    {
+      label: "Missing information",
+      value: String(missingInformation),
+      helper: "Assistant asked users for more details",
+      tone: missingInformation > 0 ? "amber" : "green",
+    },
+    {
+      label: "Needs attention",
+      value: String(needsAttention),
+      helper: "Project selection, permission, or unsupported-flow issues",
+      tone: needsAttention > 0 ? "rose" : "green",
     },
   ];
 }
@@ -3165,6 +3423,33 @@ function truncateText(value: string, maxLength: number): string {
   return `${value.slice(0, maxLength - 1)}…`;
 }
 
+function formatConfidence(value: string): string {
+  const parsed = Number(value);
+  if (Number.isFinite(parsed)) {
+    const normalized = parsed <= 1 ? parsed * 100 : parsed;
+    return `${Math.round(normalized)}%`;
+  }
+  return formatRole(value);
+}
+
+function formatMissingFields(fields: string[]): string {
+  if (fields.length === 0) {
+    return "-";
+  }
+  return fields.map(formatRole).join(", ");
+}
+
+function summarizeObject(value: Record<string, unknown>): string {
+  const entries = Object.entries(value);
+  if (entries.length === 0) {
+    return "-";
+  }
+  return entries
+    .slice(0, 4)
+    .map(([key, item]) => `${formatRole(key)}: ${String(item)}`)
+    .join("; ");
+}
+
 function zipFiles(files: { path: string; content: string }[]): Uint8Array {
   const encoder = new TextEncoder();
   const encodedFiles = files.map((file) => ({
@@ -3335,6 +3620,7 @@ function buildVisibleModules(
       module.id === "team" ||
       module.id === "knowledgebase" ||
       module.id === "whatsapp" ||
+      module.id === "assistant" ||
       module.id === "settings"
     ) {
       return isAdmin;
