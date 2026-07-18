@@ -59,6 +59,7 @@ The first foundation APIs allow platform-admin setup of:
 - assistant conversation state storage for confirmation or missing-information follow-up
 - reporting record storage for progress, manpower, material transactions, stock balances, and media/proof files
 - first confirmed-save workflow from WhatsApp confirmation replies into reporting records
+- first correction workflow before confirmation-save
 - project-selection follow-up for users assigned to multiple active projects
 
 During local development, these APIs require:
@@ -130,6 +131,15 @@ This is a rule-based foundation. External AI model calls will be added later.
 
 The assistant can now save final progress, manpower, and material records after a simple confirmation reply such as `Yes`, `OK`, or `haan`.
 
+Before saving, the user can correct the pending confirmation with replies such as:
+
+- `change quantity to 60`
+- `unit is bags`
+- `location Tower B Floor 3`
+- `material cement`
+
+The assistant updates the pending entry and asks for confirmation again.
+
 Current save behavior:
 
 - if the user has exactly one active assigned project, the confirmed update is saved to that project
@@ -141,7 +151,7 @@ Current save behavior:
 - material received/issued creates one `material_transactions` record
 - material received/issued also updates `material_stock_balances`
 
-Corrections such as “change quantity to 60” are not implemented yet.
+More complex corrections such as changing the full intent, splitting one message into multiple entries, or editing already-saved records are not implemented yet.
 Outbound WhatsApp replies are now logged through the provider-neutral outbound foundation.
 Generic/test providers simulate delivery locally; real providers remain queued until provider credentials are configured.
 

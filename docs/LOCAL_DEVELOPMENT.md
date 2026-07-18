@@ -466,7 +466,17 @@ curl -X POST http://localhost:8000/webhooks/whatsapp/generic \
   -d "{\"message_id\":\"progress-test-001\",\"phone\":\"+919999999999\",\"message_text\":\"Aaj Tower A Floor 2 me 50 sqm plaster complete hua\",\"provider_account_id\":\"local-test-account\"}"
 ```
 
-2. Send a confirmation reply:
+2. Optionally send a correction before saving:
+
+```bash
+curl -X POST http://localhost:8000/webhooks/whatsapp/generic \
+  -H "Content-Type: application/json" \
+  -d "{\"message_id\":\"progress-correct-001\",\"phone\":\"+919999999999\",\"message_text\":\"change quantity to 60 sqm\",\"provider_account_id\":\"local-test-account\"}"
+```
+
+The assistant should update the pending confirmation and ask the user to confirm again.
+
+3. Send a confirmation reply:
 
 ```bash
 curl -X POST http://localhost:8000/webhooks/whatsapp/generic \
@@ -483,6 +493,8 @@ Supported simple confirmation replies include:
 - `OK`
 - `haan`
 - `sahi hai`
+
+Supported early correction replies include simple quantity, unit, location, activity, material, and manpower-trade changes such as `change quantity to 60`, `unit is bags`, or `mason to 5`.
 
 If the user belongs to multiple possible projects, the system will not guess.
 It marks the conversation as needing project selection.

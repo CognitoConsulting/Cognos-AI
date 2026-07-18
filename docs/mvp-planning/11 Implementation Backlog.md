@@ -506,6 +506,7 @@ Acceptance criteria:
 - conversation state shows whether the assistant is waiting for confirmation, missing information, or redirecting the user professionally
 - dashboard can show assistant parse results, missing fields, and conversation states for owner/admin users
 - first confirmed-save workflow stores progress, manpower, and material records after simple replies like `Yes`, `OK`, or `haan`
+- first correction workflow updates pending confirmations for simple quantity, unit, location, activity, material, and manpower changes before save
 - project-selection follow-up supports users assigned to multiple active projects
 
 Dependencies:

@@ -29,6 +29,7 @@ from app.schemas.whatsapp import (
 )
 from app.services.assistant_parser import parse_message
 from app.services.assistant_saver import (
+    apply_pending_confirmation_correction,
     is_affirmative_confirmation,
     save_latest_confirmed_update,
     save_project_selection_reply,
@@ -301,6 +302,28 @@ async def receive_whatsapp_webhook(
             message_id=message.id,
             processing_status=message.processing_status,
             detail=project_selection_result.detail,
+        )
+
+    correction_result = apply_pending_confirmation_correction(
+        db=db,
+        user=user,
+        correction_message_text=message.message_text,
+    )
+    if correction_result.handled:
+        message.processing_status = correction_result.processing_status
+        _queue_assistant_reply(
+            db,
+            message,
+            correction_result.reply_text,
+            reason="assistant_correction",
+        )
+        db.commit()
+        db.refresh(message)
+        return WhatsAppWebhookAccepted(
+            status="accepted",
+            message_id=message.id,
+            processing_status=message.processing_status,
+            detail=correction_result.detail,
         )
 
     if is_affirmative_confirmation(message.message_text):
