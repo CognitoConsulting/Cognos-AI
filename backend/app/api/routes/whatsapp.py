@@ -2,6 +2,7 @@ from datetime import timedelta
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -12,6 +13,7 @@ from app.api.deps import (
     get_database_session,
     require_company_admin_access,
 )
+from app.api.media_access import media_access_response
 from app.models import (
     AssistantConversationState,
     AssistantParseResult,
@@ -45,7 +47,7 @@ from app.services.assistant_saver import (
     save_project_selection_reply,
 )
 from app.services.assistant_workflow import build_conversation_decision
-from app.services.media_storage import persist_inbound_media
+from app.services.media_storage import persist_inbound_media, resolve_media_access
 from app.services.whatsapp_provider import (
     find_provider_account_for_inbound,
     normalize_inbound_message,
@@ -140,6 +142,33 @@ def list_voice_notes(
             .order_by(VoiceNote.created_at.desc())
         ).all()
     )
+
+
+@router.get("/companies/{company_id}/whatsapp/voice-notes/{voice_note_id}/access")
+def access_voice_note(
+    company_id: UUID,
+    voice_note_id: UUID,
+    auth: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_database_session),
+) -> Response:
+    require_company_admin_access(db, company_id, auth)
+    voice_note = db.scalar(
+        select(VoiceNote)
+        .where(VoiceNote.id == voice_note_id)
+        .where(VoiceNote.company_id == company_id)
+    )
+    if not voice_note:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Voice note was not found for this company.",
+        )
+
+    access = resolve_media_access(
+        voice_note.storage_url,
+        file_name=voice_note.file_name,
+        mime_type=voice_note.mime_type,
+    )
+    return media_access_response(access)
 
 
 @router.post(

@@ -1,6 +1,7 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -12,6 +13,7 @@ from app.api.deps import (
     require_project_dashboard_access,
     require_project_entry_access,
 )
+from app.api.media_access import media_access_response
 from app.models import (
     Activity,
     AssistantConversationState,
@@ -39,6 +41,7 @@ from app.schemas.reporting import (
     ProgressEntryCreate,
     ProgressEntryRead,
 )
+from app.services.media_storage import resolve_media_access
 
 router = APIRouter(prefix="/companies/{company_id}/projects/{project_id}/reporting")
 
@@ -267,6 +270,34 @@ def list_media_files(
             .order_by(MediaFile.created_at.desc())
         ).all()
     )
+
+
+@router.get("/media-files/{media_file_id}/access")
+def access_media_file(
+    company_id: UUID,
+    project_id: UUID,
+    media_file_id: UUID,
+    auth: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_database_session),
+) -> Response:
+    require_project_dashboard_access(db, company_id, project_id, auth)
+    media_file = db.scalar(
+        select(MediaFile)
+        .where(MediaFile.id == media_file_id)
+        .where(MediaFile.company_id == company_id)
+        .where(MediaFile.project_id == project_id)
+    )
+    if not media_file:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Media file was not found for this project.",
+        )
+
+    access = resolve_media_access(
+        media_file.storage_url,
+        file_name=media_file.file_name,
+    )
+    return media_access_response(access)
 
 
 def _validate_common_references(

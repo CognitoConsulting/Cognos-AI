@@ -39,6 +39,7 @@ class Settings(BaseSettings):
     media_storage_s3_prefix: str = ""
     media_storage_s3_access_key_id: SecretStr | None = None
     media_storage_s3_secret_access_key: SecretStr | None = None
+    media_storage_s3_presigned_url_ttl_seconds: int = 600
     database_url: str = Field(
         default="postgresql+psycopg://cognos:cognos@db:5432/cognos_ai"
     )

@@ -28,6 +28,17 @@ class StoredMediaResult:
     audit_payload: dict | None = None
 
 
+@dataclass(frozen=True)
+class MediaAccessResult:
+    status: str
+    access_type: str | None = None
+    url: str | None = None
+    file_path: Path | None = None
+    file_name: str | None = None
+    mime_type: str | None = None
+    error_message: str | None = None
+
+
 def persist_inbound_media(
     normalized_message,
     *,
@@ -110,6 +121,46 @@ def persist_inbound_media(
     )
 
 
+def resolve_media_access(
+    storage_url: str,
+    *,
+    file_name: str | None = None,
+    mime_type: str | None = None,
+) -> MediaAccessResult:
+    parsed = urllib.parse.urlparse(storage_url or "")
+    if parsed.scheme in {"http", "https"} and parsed.netloc:
+        return MediaAccessResult(
+            status="accessible",
+            access_type="redirect",
+            url=storage_url,
+            file_name=file_name,
+            mime_type=mime_type,
+        )
+
+    if parsed.scheme != "storage" or not parsed.netloc:
+        return MediaAccessResult(
+            status="invalid_storage_url",
+            error_message="The stored media reference is not a supported storage URL.",
+        )
+
+    storage_provider = parsed.netloc.strip().lower().replace("-", "_")
+    if storage_provider == "local":
+        return _resolve_local_media_access(parsed, file_name=file_name, mime_type=mime_type)
+
+    if storage_provider in S3_COMPATIBLE_PROVIDERS:
+        return _resolve_s3_compatible_media_access(
+            parsed,
+            storage_provider=storage_provider,
+            file_name=file_name,
+            mime_type=mime_type,
+        )
+
+    return MediaAccessResult(
+        status="unsupported_storage_provider",
+        error_message=f"Media storage provider {storage_provider} is not supported for access.",
+    )
+
+
 def _store_local_media(
     *,
     content: bytes,
@@ -138,6 +189,45 @@ def _store_local_media(
             "mime_type": mime_type,
             "byte_size": byte_size,
         },
+    )
+
+
+def _resolve_local_media_access(
+    parsed: urllib.parse.ParseResult,
+    *,
+    file_name: str | None,
+    mime_type: str | None,
+) -> MediaAccessResult:
+    relative_url_path = urllib.parse.unquote(parsed.path.lstrip("/"))
+    if not relative_url_path:
+        return MediaAccessResult(
+            status="invalid_storage_url",
+            error_message="The local media reference does not include a file path.",
+        )
+
+    storage_root = Path(settings.media_storage_local_root).resolve()
+    file_path = (storage_root / Path(relative_url_path)).resolve()
+    try:
+        file_path.relative_to(storage_root)
+    except ValueError:
+        return MediaAccessResult(
+            status="invalid_storage_url",
+            error_message="The local media reference points outside the configured storage folder.",
+        )
+
+    if not file_path.is_file():
+        return MediaAccessResult(
+            status="not_found",
+            error_message="The stored media file could not be found.",
+        )
+
+    guessed_mime_type = mime_type or mimetypes.guess_type(file_path.name)[0]
+    return MediaAccessResult(
+        status="accessible",
+        access_type="file",
+        file_path=file_path,
+        file_name=file_name or file_path.name,
+        mime_type=guessed_mime_type or "application/octet-stream",
     )
 
 
@@ -227,6 +317,78 @@ def _store_s3_compatible_media(
             "mime_type": mime_type,
             "byte_size": byte_size,
         },
+    )
+
+
+def _resolve_s3_compatible_media_access(
+    parsed: urllib.parse.ParseResult,
+    *,
+    storage_provider: str,
+    file_name: str | None,
+    mime_type: str | None,
+) -> MediaAccessResult:
+    bucket = parsed.path.lstrip("/").split("/", 1)[0]
+    object_key = parsed.path.lstrip("/").split("/", 1)[1] if "/" in parsed.path.lstrip("/") else ""
+    if not bucket or not object_key:
+        return MediaAccessResult(
+            status="invalid_storage_url",
+            error_message="The S3-compatible media reference is missing a bucket or object key.",
+        )
+
+    public_base_url = (settings.media_storage_s3_public_base_url or "").strip().rstrip("/")
+    if public_base_url:
+        return MediaAccessResult(
+            status="accessible",
+            access_type="redirect",
+            url=f"{public_base_url}/{urllib.parse.quote(object_key, safe='/')}",
+            file_name=file_name,
+            mime_type=mime_type,
+        )
+
+    access_key = _secret_value(settings.media_storage_s3_access_key_id)
+    secret_key = _secret_value(settings.media_storage_s3_secret_access_key)
+    if not access_key or not secret_key:
+        return MediaAccessResult(
+            status="storage_credentials_not_configured",
+            error_message=(
+                "S3-compatible media access requires MEDIA_STORAGE_S3_ACCESS_KEY_ID "
+                "and MEDIA_STORAGE_S3_SECRET_ACCESS_KEY."
+            ),
+        )
+
+    try:
+        import boto3
+        from botocore.exceptions import BotoCoreError, ClientError
+
+        client = boto3.client(
+            "s3",
+            region_name=settings.media_storage_s3_region or None,
+            endpoint_url=settings.media_storage_s3_endpoint_url or None,
+            aws_access_key_id=access_key,
+            aws_secret_access_key=secret_key,
+        )
+        url = client.generate_presigned_url(
+            "get_object",
+            Params={"Bucket": bucket, "Key": object_key},
+            ExpiresIn=settings.media_storage_s3_presigned_url_ttl_seconds,
+        )
+    except ImportError:
+        return MediaAccessResult(
+            status="storage_dependency_missing",
+            error_message="boto3 is required for S3-compatible media access.",
+        )
+    except (BotoCoreError, ClientError) as exc:
+        return MediaAccessResult(
+            status="presign_failed",
+            error_message=f"S3-compatible media access failed: {exc}",
+        )
+
+    return MediaAccessResult(
+        status="accessible",
+        access_type="redirect",
+        url=url,
+        file_name=file_name,
+        mime_type=mime_type,
     )
 
 
