@@ -1,0 +1,9 @@
+{
+  "message_id": "voice-downloadable-001",
+  "phone": "+919999999999",
+  "provider_account_id": "local-test-account",
+  "type": "voice",
+  "voice_url": "https://example.com/audio/voice-downloadable-001.mp3",
+  "voice_id": "voice-downloadable-001-provider-id",
+  "mime_type": "audio/mpeg"
+}

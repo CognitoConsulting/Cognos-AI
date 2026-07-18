@@ -373,7 +373,24 @@ curl -X POST http://localhost:8000/webhooks/whatsapp/generic \
 
 This stores a `voice_notes` audit record. Because the sample includes a transcript, the assistant processes the transcript exactly like typed text.
 
-If a voice/audio payload does not include a transcript, the backend still stores the voice note and replies professionally asking the user to type the update until real transcription is configured.
+If a voice/audio payload does not include a transcript, the backend still stores the voice note. When OpenAI transcription is enabled and the audio file is downloadable in a supported format, the backend can transcribe it and process the transcript like typed text.
+
+Local OpenAI transcription settings:
+
+```bash
+VOICE_TRANSCRIPTION_ENABLED=true
+VOICE_TRANSCRIPTION_PROVIDER=openai
+OPENAI_API_KEY=<platform-managed-openai-key>
+OPENAI_TRANSCRIPTION_MODEL=gpt-4o-mini-transcribe
+```
+
+For company-owned AI mode, do not store raw keys in the database. For local/pilot testing, set:
+
+```bash
+COGNOS_COMPANY_OPENAI_API_KEY_<COMPANY_ID_WITH_HYPHENS_REPLACED_BY_UNDERSCORES>=<company-owned-openai-key>
+```
+
+The adapter supports OpenAI file-transcription formats such as flac, mp3, mp4, mpeg, mpga, m4a, ogg, wav, and webm. If the selected WhatsApp provider sends only a media ID instead of a downloadable URL, provider-specific media download still needs to be added.
 
 List stored voice notes:
 

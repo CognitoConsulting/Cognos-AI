@@ -64,6 +64,7 @@ Current foundation includes:
 - first WhatsApp image/proof project-selection reply workflow for multi-project users
 - first WhatsApp image/proof auto-link workflow for recent progress, manpower, and material entries
 - first WhatsApp voice-note capture foundation with transcript-ready assistant processing
+- first OpenAI transcription adapter for supported downloadable voice/audio files
 - first assistant confirmed-save workflow for WhatsApp replies like “Yes”, “OK”, or “haan”
 - first assistant correction workflow for replies like “change quantity to 60” before final save
 - first missing-information follow-up workflow for short replies like “50 bags” after the assistant asks for missing details

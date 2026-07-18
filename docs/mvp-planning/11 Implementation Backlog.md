@@ -558,7 +558,10 @@ Acceptance criteria:
 - first foundation receives generic/Meta-style audio or voice payloads
 - first foundation stores voice/audio references in `voice_notes`
 - first foundation processes provider-supplied/test transcripts through the normal assistant parser
-- real AI transcription provider connection is still future work
+- first OpenAI transcription adapter supports downloadable flac, mp3, mp4, mpeg, mpga, m4a, ogg, wav, and webm audio files
+- platform-managed transcription uses `OPENAI_API_KEY`
+- company-owned transcription can use a runtime secret environment variable without storing raw keys in the database
+- provider-specific media-ID download is still future work when the WhatsApp provider does not supply a downloadable media URL
 
 Dependencies:
 
