@@ -417,6 +417,21 @@ MEDIA_STORAGE_MAX_BYTES=104857600
 
 The local Docker setup mounts `./media` into the backend container so downloaded WhatsApp images/proofs and voice files survive backend restarts during development. The database stores `storage://local/...` references, not temporary Meta URLs.
 
+S3-compatible storage settings for AWS S3, Cloudflare R2, or similar providers:
+
+```bash
+MEDIA_STORAGE_PROVIDER=s3_compatible
+MEDIA_STORAGE_S3_BUCKET=<bucket-name>
+MEDIA_STORAGE_S3_REGION=<region>
+MEDIA_STORAGE_S3_ENDPOINT_URL=<optional-r2-or-custom-endpoint>
+MEDIA_STORAGE_S3_PUBLIC_BASE_URL=<optional-public-cdn-base-url>
+MEDIA_STORAGE_S3_PREFIX=<optional-key-prefix>
+MEDIA_STORAGE_S3_ACCESS_KEY_ID=<access-key-id>
+MEDIA_STORAGE_S3_SECRET_ACCESS_KEY=<secret-access-key>
+```
+
+Use `MEDIA_STORAGE_S3_ENDPOINT_URL` for Cloudflare R2 or any non-AWS S3-compatible provider. Leave it empty for standard AWS S3.
+
 List stored voice notes:
 
 ```bash

@@ -13,6 +13,9 @@ from uuid import UUID, uuid4
 from app.core.config import settings
 
 
+S3_COMPATIBLE_PROVIDERS = {"s3", "s3_compatible", "cloudflare_r2"}
+
+
 @dataclass(frozen=True)
 class StoredMediaResult:
     status: str
@@ -42,10 +45,11 @@ def persist_inbound_media(
             audit_payload={"status": normalized_message.stored_media_status or "already_stored"},
         )
 
-    if settings.media_storage_provider != "local_filesystem":
+    storage_provider = _normalized_storage_provider()
+    if storage_provider not in {"local_filesystem", *S3_COMPATIBLE_PROVIDERS}:
         return StoredMediaResult(
             status="storage_provider_not_supported",
-            storage_provider=settings.media_storage_provider,
+            storage_provider=storage_provider,
             error_message=(
                 f"Media storage provider {settings.media_storage_provider} is not implemented yet."
             ),
@@ -56,7 +60,7 @@ def persist_inbound_media(
     if not _is_downloadable_url(media_url):
         return StoredMediaResult(
             status="media_url_unavailable",
-            storage_provider="local_filesystem",
+            storage_provider=storage_provider,
             error_message="No downloadable media URL was available for persistence.",
             audit_payload={"status": "media_url_unavailable"},
         )
@@ -69,7 +73,7 @@ def persist_inbound_media(
     if download_result.error_message:
         return StoredMediaResult(
             status="download_failed",
-            storage_provider="local_filesystem",
+            storage_provider=storage_provider,
             error_message=download_result.error_message,
             audit_payload={"status": "download_failed"},
         )
@@ -86,9 +90,37 @@ def persist_inbound_media(
         media_type=normalized_message.media_type,
         file_name=file_name,
     )
+
+    if storage_provider in S3_COMPATIBLE_PROVIDERS:
+        return _store_s3_compatible_media(
+            content=download_result.content or b"",
+            relative_path=relative_path,
+            file_name=file_name,
+            mime_type=download_result.mime_type,
+            byte_size=len(download_result.content or b""),
+            storage_provider=storage_provider,
+        )
+
+    return _store_local_media(
+        content=download_result.content or b"",
+        relative_path=relative_path,
+        file_name=file_name,
+        mime_type=download_result.mime_type,
+        byte_size=len(download_result.content or b""),
+    )
+
+
+def _store_local_media(
+    *,
+    content: bytes,
+    relative_path: Path,
+    file_name: str,
+    mime_type: str,
+    byte_size: int,
+) -> StoredMediaResult:
     absolute_path = Path(settings.media_storage_local_root) / relative_path
     absolute_path.parent.mkdir(parents=True, exist_ok=True)
-    absolute_path.write_bytes(download_result.content or b"")
+    absolute_path.write_bytes(content)
 
     storage_url = f"storage://local/{relative_path.as_posix()}"
     return StoredMediaResult(
@@ -96,15 +128,104 @@ def persist_inbound_media(
         storage_url=storage_url,
         storage_provider="local_filesystem",
         file_name=file_name,
-        mime_type=download_result.mime_type,
-        byte_size=len(download_result.content or b""),
+        mime_type=mime_type,
+        byte_size=byte_size,
         audit_payload={
             "status": "stored",
             "storage_provider": "local_filesystem",
             "storage_url": storage_url,
             "file_name": file_name,
-            "mime_type": download_result.mime_type,
-            "byte_size": len(download_result.content or b""),
+            "mime_type": mime_type,
+            "byte_size": byte_size,
+        },
+    )
+
+
+def _store_s3_compatible_media(
+    *,
+    content: bytes,
+    relative_path: Path,
+    file_name: str,
+    mime_type: str,
+    byte_size: int,
+    storage_provider: str,
+) -> StoredMediaResult:
+    bucket = (settings.media_storage_s3_bucket or "").strip()
+    if not bucket:
+        return StoredMediaResult(
+            status="storage_bucket_not_configured",
+            storage_provider=storage_provider,
+            error_message="S3-compatible media storage requires MEDIA_STORAGE_S3_BUCKET.",
+            audit_payload={"status": "storage_bucket_not_configured"},
+        )
+
+    access_key = _secret_value(settings.media_storage_s3_access_key_id)
+    secret_key = _secret_value(settings.media_storage_s3_secret_access_key)
+    if not access_key or not secret_key:
+        return StoredMediaResult(
+            status="storage_credentials_not_configured",
+            storage_provider=storage_provider,
+            error_message=(
+                "S3-compatible media storage requires MEDIA_STORAGE_S3_ACCESS_KEY_ID "
+                "and MEDIA_STORAGE_S3_SECRET_ACCESS_KEY."
+            ),
+            audit_payload={"status": "storage_credentials_not_configured"},
+        )
+
+    object_key = _s3_object_key(relative_path)
+    try:
+        import boto3
+        from botocore.exceptions import BotoCoreError, ClientError
+
+        client = boto3.client(
+            "s3",
+            region_name=settings.media_storage_s3_region or None,
+            endpoint_url=settings.media_storage_s3_endpoint_url or None,
+            aws_access_key_id=access_key,
+            aws_secret_access_key=secret_key,
+        )
+        client.put_object(
+            Bucket=bucket,
+            Key=object_key,
+            Body=content,
+            ContentType=mime_type,
+        )
+    except ImportError as exc:
+        return StoredMediaResult(
+            status="storage_dependency_missing",
+            storage_provider=storage_provider,
+            error_message="boto3 is required for S3-compatible media storage.",
+            audit_payload={"status": "storage_dependency_missing"},
+        )
+    except (BotoCoreError, ClientError) as exc:
+        return StoredMediaResult(
+            status="upload_failed",
+            storage_provider=storage_provider,
+            error_message=f"S3-compatible upload failed: {exc}",
+            audit_payload={"status": "upload_failed", "bucket": bucket, "object_key": object_key},
+        )
+
+    storage_url = _s3_storage_url(
+        bucket=bucket,
+        object_key=object_key,
+        storage_provider=storage_provider,
+    )
+    return StoredMediaResult(
+        status="stored",
+        storage_url=storage_url,
+        storage_provider=storage_provider,
+        file_name=file_name,
+        mime_type=mime_type,
+        byte_size=byte_size,
+        audit_payload={
+            "status": "stored",
+            "storage_provider": storage_provider,
+            "storage_url": storage_url,
+            "bucket": bucket,
+            "object_key": object_key,
+            "file_name": file_name,
+            "mime_type": mime_type,
+            "byte_size": byte_size,
         },
     )
 
@@ -212,3 +333,27 @@ def _fallback_extension(media_type: str | None) -> str:
 def _is_downloadable_url(media_url: str | None) -> bool:
     parsed = urllib.parse.urlparse(media_url or "")
     return parsed.scheme in {"http", "https"} and bool(parsed.netloc)
+
+
+def _normalized_storage_provider() -> str:
+    return settings.media_storage_provider.strip().lower().replace("-", "_")
+
+
+def _secret_value(secret) -> str | None:
+    if not secret:
+        return None
+    value = secret.get_secret_value() if hasattr(secret, "get_secret_value") else str(secret)
+    return value.strip() or None
+
+
+def _s3_object_key(relative_path: Path) -> str:
+    prefix = settings.media_storage_s3_prefix.strip().strip("/")
+    path = relative_path.as_posix()
+    return f"{prefix}/{path}" if prefix else path
+
+
+def _s3_storage_url(*, bucket: str, object_key: str, storage_provider: str) -> str:
+    public_base_url = (settings.media_storage_s3_public_base_url or "").strip().rstrip("/")
+    if public_base_url:
+        return f"{public_base_url}/{urllib.parse.quote(object_key, safe='/')}"
+    return f"storage://{storage_provider}/{bucket}/{object_key}"

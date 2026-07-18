@@ -565,7 +565,8 @@ Acceptance criteria:
 - Meta access tokens are loaded from runtime secrets, not stored in normal database records
 - resolved Meta media URLs are treated as runtime-only and are not stored permanently in the Cognos audit payload
 - first local object-storage-style adapter stores inbound media files and saves `storage://local/...` references
-- cloud object storage such as S3, Cloudflare R2, or Azure Blob is still future work
+- first S3-compatible storage provider interface supports AWS S3, Cloudflare R2, and similar object storage services
+- Azure Blob storage is still future work
 
 Dependencies:
 
