@@ -291,6 +291,25 @@ async def receive_whatsapp_webhook(
             detail="Inbound WhatsApp message stored, but the user phone number is unknown.",
         )
 
+    if not normalized.media_type:
+        media_project_result = _save_pending_media_project_selection_reply(db, user, message)
+        if media_project_result:
+            message.processing_status = media_project_result["processing_status"]
+            _queue_assistant_reply(
+                db,
+                message,
+                media_project_result["reply_text"],
+                reason="assistant_media_project_selection",
+            )
+            db.commit()
+            db.refresh(message)
+            return WhatsAppWebhookAccepted(
+                status="accepted",
+                message_id=message.id,
+                processing_status=message.processing_status,
+                detail=media_project_result["detail"],
+            )
+
     media_result = _save_inbound_media_if_possible(db, user, message, normalized)
     if media_result:
         message.processing_status = media_result["processing_status"]
@@ -517,8 +536,7 @@ def _save_inbound_media_if_possible(
             "detail": "Inbound media was received, but project selection is required.",
             "reply_text": (
                 "I received your image/proof, but I need to know which project it belongs to. "
-                "Please resend it with the project name/code for now. Automatic photo project "
-                "selection is the next workflow."
+                "Please reply with the project name or project code."
             ),
         }
 
@@ -548,6 +566,116 @@ def _save_inbound_media_if_possible(
             "next workflow."
         ),
     }
+
+
+def _save_pending_media_project_selection_reply(
+    db: Session,
+    user: User,
+    message: WhatsAppMessage,
+) -> dict[str, str] | None:
+    if not message.message_text:
+        return None
+
+    pending_media_message = _find_latest_pending_media_message(db, user)
+    if not pending_media_message:
+        return None
+
+    match_result = _match_project_from_text(db, user, message.message_text)
+    if match_result["status"] == "no_match":
+        return {
+            "processing_status": "media_needs_project",
+            "detail": "Media project selection reply did not match an active project.",
+            "reply_text": (
+                "I could not match that to one of your active projects. "
+                "Please send the project name or project code for the image/proof."
+            ),
+        }
+
+    if match_result["status"] == "ambiguous":
+        return {
+            "processing_status": "media_needs_project",
+            "detail": "Media project selection reply matched more than one project.",
+            "reply_text": (
+                "I found more than one matching project. Please send the exact project code "
+                "for the image/proof."
+            ),
+        }
+
+    project = match_result["project"]
+    media_file = _create_media_file_from_pending_message(
+        db=db,
+        user=user,
+        pending_media_message=pending_media_message,
+        project=project,
+    )
+    pending_media_message.processing_status = "media_stored"
+    message.raw_provider_payload = {
+        **(message.raw_provider_payload or {}),
+        "_cognos_media_project_selection": {
+            "pending_media_message_id": str(pending_media_message.id),
+            "media_file_id": str(media_file.id),
+            "project_id": str(project.id),
+        },
+    }
+    return {
+        "processing_status": "media_project_selected",
+        "detail": "Media project selection received and image/proof stored.",
+        "reply_text": f"Received. I stored the image/proof for {project.name}.",
+    }
+
+
+def _find_latest_pending_media_message(db: Session, user: User) -> WhatsAppMessage | None:
+    pending_messages = list(
+        db.scalars(
+            select(WhatsAppMessage)
+            .where(WhatsAppMessage.company_id == user.company_id)
+            .where(WhatsAppMessage.user_id == user.id)
+            .where(WhatsAppMessage.direction == "inbound")
+            .where(WhatsAppMessage.processing_status == "media_needs_project")
+            .order_by(WhatsAppMessage.received_at.desc())
+            .limit(10)
+        ).all()
+    )
+    for pending_message in pending_messages:
+        if (pending_message.raw_provider_payload or {}).get("_cognos_media"):
+            return pending_message
+    return None
+
+
+def _create_media_file_from_pending_message(
+    db: Session,
+    user: User,
+    pending_media_message: WhatsAppMessage,
+    project: Project,
+) -> MediaFile:
+    media_payload = (pending_media_message.raw_provider_payload or {}).get("_cognos_media") or {}
+    media_file = MediaFile(
+        company_id=project.company_id,
+        project_id=project.id,
+        uploaded_by=user.id,
+        source_whatsapp_message_id=pending_media_message.id,
+        linked_entity_type="whatsapp_message",
+        linked_entity_id=pending_media_message.id,
+        media_type=media_payload.get("media_type") or "image",
+        storage_url=_media_storage_url_from_payload(
+            pending_media_message.provider_name,
+            media_payload,
+        ),
+        file_name=media_payload.get("media_file_name"),
+        caption=media_payload.get("media_caption") or pending_media_message.message_text,
+        provider_media_id=media_payload.get("provider_media_id"),
+        processing_status="stored" if media_payload.get("media_url") else "provider_reference",
+        captured_at=pending_media_message.received_at,
+    )
+    db.add(media_file)
+    db.flush()
+    return media_file
+
+
+def _media_storage_url_from_payload(provider_name: str, media_payload: dict) -> str:
+    if media_payload.get("media_url"):
+        return media_payload["media_url"]
+    return f"provider://{provider_name}/{media_payload.get('provider_media_id') or 'media'}"
 
 
 def _media_storage_url(normalized) -> str:
@@ -587,6 +715,44 @@ def _projects_available_to_user(db: Session, user: User) -> list[Project]:
             .order_by(Project.created_at.desc())
         ).all()
     )
+
+
+def _match_project_from_text(db: Session, user: User, project_selection_text: str) -> dict:
+    text = _normalize_project_text(project_selection_text)
+    if not text:
+        return {"status": "no_match", "project": None}
+
+    projects = _projects_available_to_user(db, user)
+    exact_matches = [
+        project
+        for project in projects
+        if text in {_normalize_project_text(project.code), _normalize_project_text(project.name)}
+    ]
+    if len(exact_matches) == 1:
+        return {"status": "matched", "project": exact_matches[0]}
+    if len(exact_matches) > 1:
+        return {"status": "ambiguous", "project": None}
+
+    partial_matches = [
+        project
+        for project in projects
+        if _project_text_matches(text, project.name) or _project_text_matches(text, project.code)
+    ]
+    if len(partial_matches) == 1:
+        return {"status": "matched", "project": partial_matches[0]}
+    if len(partial_matches) > 1:
+        return {"status": "ambiguous", "project": None}
+
+    return {"status": "no_match", "project": None}
+
+
+def _project_text_matches(text: str, candidate: str | None) -> bool:
+    candidate_text = _normalize_project_text(candidate)
+    return bool(candidate_text and (text in candidate_text or candidate_text in text))
+
+
+def _normalize_project_text(value: str | None) -> str:
+    return " ".join((value or "").strip().lower().replace("-", " ").split())
 
 
 def _find_user_by_phone(db: Session, phone: str | None) -> User | None:

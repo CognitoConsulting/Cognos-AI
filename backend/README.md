@@ -112,7 +112,7 @@ Current supported intake formats:
 
 It normalizes inbound provider payloads and stores them in `whatsapp_messages`.
 
-For image/proof messages, the webhook can create `media_files` records when the sender belongs to exactly one active project. If the sender belongs to multiple projects, the system does not guess yet and asks for clearer project context.
+For image/proof messages, the webhook can create `media_files` records when the sender belongs to exactly one active project. If the sender belongs to multiple projects, the system asks for the project name/code and can use the next text reply to link the pending image/proof to the selected project.
 
 This media foundation stores the supplied media URL or provider media reference. It does not yet download provider media into long-term object storage.
 
