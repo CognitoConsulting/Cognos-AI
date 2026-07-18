@@ -1352,6 +1352,16 @@ export function App() {
           </div>
         </section>
 
+        <section className="info-banner" aria-label="Reporting data limit notice">
+          <div>
+            <strong>Showing the latest {REPORTING_PAGE_LIMIT} records per reporting section.</strong>
+            <p>
+              Date filters are applied by the backend first. Full page-by-page navigation is planned
+              after the MVP data model settles.
+            </p>
+          </div>
+        </section>
+
         <section className="card-grid" aria-label="Summary cards">
           {summaryCards.map((card) => (
             <article className={`summary-card ${card.tone}`} key={card.label}>
@@ -1413,8 +1423,9 @@ export function App() {
           <article className="panel">
             <h3>Export</h3>
             <p>
-              Download the currently loaded and filtered records as one Excel workbook with
-              separate sheets for each report section you can access.
+              Download the currently loaded records as one Excel workbook with separate sheets for
+              each report section you can access. The MVP export uses the same latest{" "}
+              {REPORTING_PAGE_LIMIT}-record cap as the dashboard view.
             </p>
             <div className="button-row">
               <button

@@ -226,6 +226,24 @@ a {
   color: #175cd3;
 }
 
+.info-banner {
+  background: #eff8ff;
+  border: 1px solid #b2ddff;
+  border-radius: 18px;
+  color: #175cd3;
+  padding: 18px 20px;
+}
+
+.info-banner strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.info-banner p {
+  color: #1849a9;
+  margin: 0;
+}
+
 .error-message {
   background: #fef3f2;
   color: #b42318;

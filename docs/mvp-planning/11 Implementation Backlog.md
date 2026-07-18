@@ -720,6 +720,7 @@ Acceptance criteria:
 - dashboard sends the selected date range to reporting APIs instead of only filtering after loading all rows
 - reporting APIs support `limit` and `offset` so large projects can be loaded in bounded pages
 - dashboard reporting requests are capped to the MVP page size until full page navigation is added
+- dashboard tells users that reporting views and exports currently show the latest MVP-capped records
 - filters support user, activity, and material where relevant
 
 Dependencies:
