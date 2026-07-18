@@ -58,6 +58,7 @@ The first foundation APIs allow platform-admin setup of:
 - first assistant parser result storage
 - assistant conversation state storage for confirmation or missing-information follow-up
 - reporting record storage for progress, manpower, material transactions, stock balances, and media/proof files
+- WhatsApp image/proof capture into `media_files` for users with one active project
 - first confirmed-save workflow from WhatsApp confirmation replies into reporting records
 - first correction workflow before confirmation-save
 - first missing-information follow-up workflow before confirmation-save
@@ -106,10 +107,14 @@ Current supported intake formats:
 
 - generic/test JSON payloads
 - Meta WhatsApp Cloud API style text message payloads
-
-This does not yet send WhatsApp replies or run the AI assistant workflow.
+- generic/test image payloads with media URL/provider media ID
+- Meta WhatsApp Cloud API style image/video/document references
 
 It normalizes inbound provider payloads and stores them in `whatsapp_messages`.
+
+For image/proof messages, the webhook can create `media_files` records when the sender belongs to exactly one active project. If the sender belongs to multiple projects, the system does not guess yet and asks for clearer project context.
+
+This media foundation stores the supplied media URL or provider media reference. It does not yet download provider media into long-term object storage.
 
 The webhook also creates a first parser result in `assistant_parse_results`.
 It now creates a conversation state in `assistant_conversation_states` so the next step is visible:

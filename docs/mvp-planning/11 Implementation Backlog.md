@@ -573,10 +573,13 @@ Images create trust and proof for site progress and material movement.
 Acceptance criteria:
 
 - system receives image
-- image is stored in object storage
+- final production image binary is stored in object storage
 - image is linked to project, user, and timestamp
+- first foundation stores generic/Meta image references in `media_files` for single-project users
+- system does not guess the project when the sender has multiple active projects
 - caption is processed if present
 - if caption is missing, assistant asks what the image relates to
+- downloading provider media into long-term object storage is still future work
 
 Dependencies:
 

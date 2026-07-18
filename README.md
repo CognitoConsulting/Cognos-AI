@@ -60,6 +60,7 @@ Current foundation includes:
 - daily WhatsApp summary foundation with configurable 7 PM local default, preview, manual send, and send audit records
 - automatic in-app daily summary scheduler that checks local project time and sends each project summary once per day
 - reporting record tables for progress, manpower, materials, stock balances, and media/proof files
+- first WhatsApp image/proof capture workflow that stores media URLs/provider references for single-project users
 - first assistant confirmed-save workflow for WhatsApp replies like “Yes”, “OK”, or “haan”
 - first assistant correction workflow for replies like “change quantity to 60” before final save
 - first missing-information follow-up workflow for short replies like “50 bags” after the assistant asks for missing details

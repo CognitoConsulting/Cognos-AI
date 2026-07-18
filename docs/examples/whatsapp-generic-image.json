@@ -1,0 +1,11 @@
+{
+  "message_id": "image-proof-001",
+  "phone": "+919999999999",
+  "message_text": "Tower A Floor 2 plaster proof",
+  "provider_account_id": "local-test-account",
+  "media_type": "image",
+  "media_url": "https://example.com/demo/proof-image.jpg",
+  "provider_media_id": "local-proof-image-001",
+  "file_name": "tower-a-floor-2-plaster.jpg",
+  "caption": "Tower A Floor 2 plaster proof"
+}
