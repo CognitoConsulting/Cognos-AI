@@ -567,6 +567,15 @@ curl http://localhost:8000/companies/<company_id>/projects/<project_id>/reportin
   -H "X-Platform-Admin-Token: local-dev-platform-admin-token"
 ```
 
+List records for a date range:
+
+```bash
+curl "http://localhost:8000/companies/<company_id>/projects/<project_id>/reporting/progress-entries?from_date=2026-07-01&to_date=2026-07-31" \
+  -H "X-Platform-Admin-Token: local-dev-platform-admin-token"
+```
+
+The same `from_date` and `to_date` query parameters are supported by progress, manpower, material transaction, and media/proof list endpoints. Material stock balances are not date-filtered because they represent the current stock position.
+
 The reporting APIs are still foundation APIs.
 They are now connected to the first assistant confirmation-save workflow.
 Dashboard charts are not connected yet.
