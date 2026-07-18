@@ -232,6 +232,8 @@ type MaterialStockBalance = {
 
 type MediaFile = {
   id: string;
+  linked_entity_type: string | null;
+  linked_entity_id: string | null;
   media_type: string;
   storage_url: string;
   file_name: string | null;
@@ -1406,11 +1408,12 @@ export function App() {
               title="Image/proof files"
               emptyMessage="No media files yet."
               helper="Image and proof records linked to project reporting activity."
-              columns={["Created", "Type", "File", "Status"]}
+              columns={["Created", "Type", "File", "Linked to", "Status"]}
               rows={filteredData.media.map((entry) => [
                 formatDateTime(entry.created_at),
                 entry.media_type,
                 entry.file_name ?? entry.caption ?? entry.storage_url,
+                formatMediaLink(entry),
                 entry.processing_status,
               ])}
             />
@@ -3447,13 +3450,14 @@ function exportExcelWorkbook({
     sheets.push({
       name: "Media Proof",
       rows: [
-        ["Created", "Type", "File", "Caption", "Storage URL", "Status"],
+        ["Created", "Type", "File", "Caption", "Storage URL", "Linked To", "Status"],
         ...data.media.map((entry) => [
           formatDateTime(entry.created_at),
           entry.media_type,
           entry.file_name ?? "",
           entry.caption ?? "",
           entry.storage_url,
+          formatMediaLink(entry),
           entry.processing_status,
         ]),
       ],
@@ -3727,6 +3731,19 @@ function formatDateRange(fromDate: string, toDate: string): string {
 
 function formatDateTime(value: string): string {
   return new Date(value).toLocaleString();
+}
+
+function formatMediaLink(entry: MediaFile): string {
+  if (!entry.linked_entity_type) {
+    return "Project proof";
+  }
+  const labels: Record<string, string> = {
+    progress_entry: "Progress entry",
+    manpower_entry: "Manpower entry",
+    material_transaction: "Material entry",
+    whatsapp_message: "Project proof",
+  };
+  return labels[entry.linked_entity_type] ?? formatRole(entry.linked_entity_type);
 }
 
 function formatTime(value: string): string {
