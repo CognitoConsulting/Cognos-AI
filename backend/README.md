@@ -63,6 +63,7 @@ The first foundation APIs allow platform-admin setup of:
 - OpenAI transcription adapter for supported downloadable voice/audio files
 - Meta WhatsApp media-ID URL resolution for inbound media/voice references
 - local object-storage-style persistence for inbound WhatsApp media files
+- S3-compatible media storage provider interface for AWS S3, Cloudflare R2, and similar services
 - first confirmed-save workflow from WhatsApp confirmation replies into reporting records
 - first correction workflow before confirmation-save
 - first missing-information follow-up workflow before confirmation-save
@@ -152,7 +153,22 @@ MEDIA_STORAGE_LOCAL_ROOT=media
 MEDIA_STORAGE_MAX_BYTES=104857600
 ```
 
-The storage layer is intentionally separate from WhatsApp and OpenAI. Later, `local_filesystem` can be replaced with S3, Cloudflare R2, Azure Blob, or another object storage provider without changing the user-facing WhatsApp workflow.
+The storage layer is intentionally separate from WhatsApp and OpenAI. `local_filesystem` can be used for development, while `s3_compatible` can be used for AWS S3, Cloudflare R2, or another S3-compatible object storage provider without changing the user-facing WhatsApp workflow.
+
+S3-compatible media storage settings:
+
+```text
+MEDIA_STORAGE_PROVIDER=s3_compatible
+MEDIA_STORAGE_S3_BUCKET=<bucket-name>
+MEDIA_STORAGE_S3_REGION=<region>
+MEDIA_STORAGE_S3_ENDPOINT_URL=<optional-r2-or-custom-endpoint>
+MEDIA_STORAGE_S3_PUBLIC_BASE_URL=<optional-public-cdn-base-url>
+MEDIA_STORAGE_S3_PREFIX=<optional-key-prefix>
+MEDIA_STORAGE_S3_ACCESS_KEY_ID=<access-key-id>
+MEDIA_STORAGE_S3_SECRET_ACCESS_KEY=<secret-access-key>
+```
+
+If `MEDIA_STORAGE_S3_PUBLIC_BASE_URL` is provided, the database stores a public/CDN URL. Otherwise, it stores an internal reference like `storage://s3_compatible/<bucket>/<object-key>`.
 
 Platform-managed AI mode uses `OPENAI_API_KEY`.
 
@@ -168,7 +184,7 @@ Example:
 COGNOS_COMPANY_OPENAI_API_KEY_11111111_1111_1111_1111_111111111111
 ```
 
-The current adapter supports downloadable files in OpenAI-supported formats such as flac, mp3, mp4, mpeg, mpga, m4a, ogg, wav, and webm. Cloud object storage such as S3/R2/Azure Blob is still future work; the MVP foundation uses local object-storage-style persistence.
+The current adapter supports downloadable files in OpenAI-supported formats such as flac, mp3, mp4, mpeg, mpga, m4a, ogg, wav, and webm. Azure Blob is still future work; the MVP now has local and S3-compatible provider paths.
 
 The webhook also creates a first parser result in `assistant_parse_results`.
 It now creates a conversation state in `assistant_conversation_states` so the next step is visible:
