@@ -23,10 +23,12 @@ from app.models import (
     ProjectUser,
     ProgressEntry,
     User,
+    VoiceNote,
     WhatsAppMessage,
     WhatsAppProviderAccount,
 )
 from app.schemas.assistant import AssistantConversationStateRead, AssistantParseResultRead
+from app.schemas.reporting import VoiceNoteRead
 from app.schemas.whatsapp import (
     WhatsAppMessageRead,
     WhatsAppOutboundTextCreate,
@@ -48,6 +50,7 @@ from app.services.whatsapp_provider import (
     normalize_inbound_message,
     queue_outbound_text_message,
 )
+from app.services.voice_transcription import is_voice_media_type, transcribe_voice_note
 
 router = APIRouter()
 
@@ -114,6 +117,25 @@ def list_whatsapp_messages(
             select(WhatsAppMessage)
             .where(WhatsAppMessage.company_id == company_id)
             .order_by(WhatsAppMessage.received_at.desc())
+        ).all()
+    )
+
+
+@router.get(
+    "/companies/{company_id}/whatsapp/voice-notes",
+    response_model=list[VoiceNoteRead],
+)
+def list_voice_notes(
+    company_id: UUID,
+    auth: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_database_session),
+) -> list[VoiceNote]:
+    require_company_admin_access(db, company_id, auth)
+    return list(
+        db.scalars(
+            select(VoiceNote)
+            .where(VoiceNote.company_id == company_id)
+            .order_by(VoiceNote.created_at.desc())
         ).all()
     )
 
@@ -294,6 +316,32 @@ async def receive_whatsapp_webhook(
             processing_status=message.processing_status,
             detail="Inbound WhatsApp message stored, but the user phone number is unknown.",
         )
+
+    voice_result = _capture_voice_note_if_possible(db, user, message, normalized)
+    if voice_result:
+        message.raw_provider_payload = {
+            **(message.raw_provider_payload or {}),
+            "_cognos_voice": voice_result["audit_payload"],
+        }
+        if not voice_result.get("transcript_text"):
+            message.processing_status = voice_result["processing_status"]
+            _queue_assistant_reply(
+                db,
+                message,
+                voice_result["reply_text"],
+                reason="assistant_voice_capture",
+            )
+            db.commit()
+            db.refresh(message)
+            return WhatsAppWebhookAccepted(
+                status="accepted",
+                message_id=message.id,
+                processing_status=message.processing_status,
+                detail=voice_result["detail"],
+            )
+
+        message.message_text = voice_result["transcript_text"]
+        db.flush()
 
     if not normalized.media_type:
         media_project_result = _save_pending_media_project_selection_reply(db, user, message)
@@ -521,6 +569,8 @@ def _save_inbound_media_if_possible(
     normalized,
 ) -> dict[str, str] | None:
     if not normalized.media_type:
+        return None
+    if is_voice_media_type(normalized.media_type):
         return None
 
     projects = _projects_available_to_user(db, user)
@@ -822,7 +872,80 @@ def _normalized_media_audit_payload(normalized) -> dict[str, str | None]:
         "media_file_name": normalized.media_file_name,
         "provider_media_id": normalized.provider_media_id,
         "media_caption": normalized.media_caption,
+        "media_mime_type": normalized.media_mime_type,
+        "transcription_text": normalized.transcription_text,
     }
+
+
+def _capture_voice_note_if_possible(
+    db: Session,
+    user: User,
+    message: WhatsAppMessage,
+    normalized,
+) -> dict | None:
+    if not is_voice_media_type(normalized.media_type):
+        return None
+
+    transcription = transcribe_voice_note(normalized)
+    project = _single_project_available_to_user(db, user)
+    voice_note = VoiceNote(
+        company_id=user.company_id,
+        project_id=project.id if project else None,
+        uploaded_by=user.id,
+        source_whatsapp_message_id=message.id,
+        storage_url=_media_storage_url(normalized),
+        file_name=normalized.media_file_name,
+        provider_media_id=normalized.provider_media_id,
+        mime_type=normalized.media_mime_type,
+        transcription_status=transcription.status,
+        transcription_provider=transcription.provider_name,
+        transcript_text=transcription.transcript_text,
+        transcript_language=transcription.language,
+        error_message=transcription.error_message,
+        captured_at=message.received_at,
+    )
+    db.add(voice_note)
+    db.flush()
+
+    audit_payload = {
+        "voice_note_id": str(voice_note.id),
+        "transcription_status": transcription.status,
+        "transcription_provider": transcription.provider_name,
+        "transcript_available": bool(transcription.transcript_text),
+    }
+
+    if transcription.transcript_text:
+        return {
+            "processing_status": "voice_transcribed",
+            "detail": "Inbound WhatsApp voice note was stored, transcribed, and sent to the assistant workflow.",
+            "transcript_text": transcription.transcript_text,
+            "audit_payload": audit_payload,
+        }
+
+    if transcription.status == "queued":
+        reply_text = (
+            "Received your voice note. Voice transcription is not fully connected yet, "
+            "so I have stored it for audit. Please type the update for now so I can record it."
+        )
+        processing_status = "voice_transcription_pending"
+    else:
+        reply_text = (
+            "Received your voice note, but voice transcription is not configured yet. "
+            "Please type the update for now, or ask your admin to enable voice transcription."
+        )
+        processing_status = "voice_transcription_not_configured"
+
+    return {
+        "processing_status": processing_status,
+        "detail": "Inbound WhatsApp voice note was stored, but no transcript was available.",
+        "reply_text": reply_text,
+        "audit_payload": audit_payload,
+    }
+
+
+def _single_project_available_to_user(db: Session, user: User) -> Project | None:
+    projects = _projects_available_to_user(db, user)
+    return projects[0] if len(projects) == 1 else None
 
 
 def _projects_available_to_user(db: Session, user: User) -> list[Project]:

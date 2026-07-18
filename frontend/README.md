@@ -33,6 +33,7 @@ Current live dashboard foundation:
 - lets owner/admin users download knowledgebase templates, upload completed `.xlsx` templates, and view upload history
 - lets owner/admin users configure daily WhatsApp summaries, preview the message, send manually, and view send history
 - lets owner/admin users review company-level inbound/outbound WhatsApp message logs
+- lets owner/admin users review WhatsApp voice-note transcript status and stored media references
 - lets owner/admin users add and review WhatsApp provider accounts for local/generic and Meta-style setups
 - lets owner/admin users review assistant parse results, missing fields, and conversation states for pilot debugging
 - lets owner/admin users configure whether the company uses platform-managed AI keys or company-owned AI mode

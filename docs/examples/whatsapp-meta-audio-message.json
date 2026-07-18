@@ -1,0 +1,32 @@
+{
+  "object": "whatsapp_business_account",
+  "entry": [
+    {
+      "id": "whatsapp-business-account-id",
+      "changes": [
+        {
+          "field": "messages",
+          "value": {
+            "metadata": {
+              "display_phone_number": "15551234567",
+              "phone_number_id": "local-test-account"
+            },
+            "messages": [
+              {
+                "from": "+919999999999",
+                "id": "wamid.voice-progress-001",
+                "timestamp": "1721217600",
+                "type": "audio",
+                "audio": {
+                  "id": "meta-audio-media-id",
+                  "mime_type": "audio/ogg",
+                  "voice": true
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

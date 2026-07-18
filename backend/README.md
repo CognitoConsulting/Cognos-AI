@@ -59,6 +59,7 @@ The first foundation APIs allow platform-admin setup of:
 - assistant conversation state storage for confirmation or missing-information follow-up
 - reporting record storage for progress, manpower, material transactions, stock balances, and media/proof files
 - WhatsApp image/proof capture into `media_files` for users with one active project
+- WhatsApp voice-note capture into `voice_notes`, with provider-supplied transcripts processed like text
 - first confirmed-save workflow from WhatsApp confirmation replies into reporting records
 - first correction workflow before confirmation-save
 - first missing-information follow-up workflow before confirmation-save
@@ -117,6 +118,8 @@ For image/proof messages, the webhook can create `media_files` records when the 
 When a photo/proof arrives within 30 minutes of the same user's latest saved progress, manpower, or material entry for that project, the media record is linked to that entry. Material transactions also move from `not_attached` to `attached` proof status.
 
 This media foundation stores the supplied media URL or provider media reference. It does not yet download provider media into long-term object storage.
+
+For voice notes, the webhook creates a `voice_notes` audit record. If the inbound provider or test payload includes a transcript, that transcript is processed through the same assistant workflow as a typed WhatsApp message. If no transcript is available, the voice note is stored and the user is asked to type the update until real transcription is configured.
 
 The webhook also creates a first parser result in `assistant_parse_results`.
 It now creates a conversation state in `assistant_conversation_states` so the next step is visible:
@@ -189,7 +192,8 @@ The backend now has foundation tables and admin APIs for:
 - `manpower_entries`: workers by trade/category, date, and project area
 - `material_transactions`: material received and material issued
 - `material_stock_balances`: current material stock by project and material
-- `media_files`: photos, voice notes, and proof files linked to a project or future record
+- `media_files`: photos and proof files linked to a project or reporting record
+- `voice_notes`: WhatsApp voice/audio submissions, transcript status, transcript text when available, and original provider media reference
 
 These tables are intentionally separate from raw WhatsApp messages.
 Raw messages preserve what the user sent.

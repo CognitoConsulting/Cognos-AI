@@ -155,3 +155,28 @@ class MediaFile(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=datetime.utcnow, nullable=False
     )
+
+
+class VoiceNote(Base):
+    __tablename__ = "voice_notes"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    company_id: Mapped[UUID] = mapped_column(ForeignKey("companies.id"), nullable=False)
+    project_id: Mapped[UUID | None] = mapped_column(ForeignKey("projects.id"), nullable=True)
+    uploaded_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    source_whatsapp_message_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("whatsapp_messages.id"), nullable=True
+    )
+    storage_url: Mapped[str] = mapped_column(String(500), nullable=False)
+    file_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    provider_media_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    mime_type: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    transcription_status: Mapped[str] = mapped_column(String(50), nullable=False)
+    transcription_provider: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    transcript_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    transcript_language: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    captured_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=datetime.utcnow, nullable=False
+    )
