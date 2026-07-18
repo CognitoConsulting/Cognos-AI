@@ -24,6 +24,9 @@ class NormalizedInboundMessage:
     media_caption: str | None
     media_mime_type: str | None
     media_download_headers: dict[str, str] | None
+    stored_media_url: str | None
+    stored_media_status: str | None
+    stored_media_error: str | None
     transcription_text: str | None
     raw_payload: dict[str, Any]
 
@@ -230,6 +233,9 @@ def _normalize_generic_payload(
         media_caption=media_caption,
         media_mime_type=media_mime_type,
         media_download_headers=None,
+        stored_media_url=None,
+        stored_media_status=None,
+        stored_media_error=None,
         transcription_text=transcription_text,
         raw_payload=payload,
     )
@@ -297,6 +303,9 @@ def _normalize_meta_payload(
         media_caption=media_caption,
         media_mime_type=media_mime_type,
         media_download_headers=None,
+        stored_media_url=None,
+        stored_media_status=None,
+        stored_media_error=None,
         transcription_text=transcription_text,
         raw_payload=payload,
     )

@@ -564,7 +564,8 @@ Acceptance criteria:
 - first Meta WhatsApp adapter can resolve provider media IDs into short-lived downloadable URLs
 - Meta access tokens are loaded from runtime secrets, not stored in normal database records
 - resolved Meta media URLs are treated as runtime-only and are not stored permanently in the Cognos audit payload
-- long-term object storage for downloaded media is still future work
+- first local object-storage-style adapter stores inbound media files and saves `storage://local/...` references
+- cloud object storage such as S3, Cloudflare R2, or Azure Blob is still future work
 
 Dependencies:
 
@@ -590,6 +591,7 @@ Acceptance criteria:
 - next project name/code reply can link the pending image/proof to the selected project
 - media can auto-link to the same user's latest recent progress, manpower, or material entry
 - material proof status is marked attached when media links to a material transaction
+- first local storage adapter persists downloaded image/proof files before saving the media record
 - caption is processed if present
 - if caption is missing, assistant asks what the image relates to
 - downloading provider media into long-term object storage is still future work

@@ -407,6 +407,16 @@ The adapter supports OpenAI file-transcription formats such as flac, mp3, mp4, m
 
 For Meta payloads that include only a media ID, the backend can resolve the media ID into a short-lived URL before transcription. The resolved URL is treated as runtime-only and is not stored permanently in the audit payload.
 
+Local media storage settings:
+
+```bash
+MEDIA_STORAGE_PROVIDER=local_filesystem
+MEDIA_STORAGE_LOCAL_ROOT=media
+MEDIA_STORAGE_MAX_BYTES=104857600
+```
+
+The local Docker setup mounts `./media` into the backend container so downloaded WhatsApp images/proofs and voice files survive backend restarts during development. The database stores `storage://local/...` references, not temporary Meta URLs.
+
 List stored voice notes:
 
 ```bash

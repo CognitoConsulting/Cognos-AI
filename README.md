@@ -66,6 +66,7 @@ Current foundation includes:
 - first WhatsApp voice-note capture foundation with transcript-ready assistant processing
 - first OpenAI transcription adapter for supported downloadable voice/audio files
 - first Meta WhatsApp media-ID URL resolution adapter for inbound media
+- first local object-storage-style media persistence for WhatsApp images/proofs and voice notes
 - first assistant confirmed-save workflow for WhatsApp replies like “Yes”, “OK”, or “haan”
 - first assistant correction workflow for replies like “change quantity to 60” before final save
 - first missing-information follow-up workflow for short replies like “50 bags” after the assistant asks for missing details
