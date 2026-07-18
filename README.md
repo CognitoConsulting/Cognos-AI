@@ -62,6 +62,7 @@ Current foundation includes:
 - reporting record tables for progress, manpower, materials, stock balances, and media/proof files
 - first assistant confirmed-save workflow for WhatsApp replies like “Yes”, “OK”, or “haan”
 - first assistant correction workflow for replies like “change quantity to 60” before final save
+- first missing-information follow-up workflow for short replies like “50 bags” after the assistant asks for missing details
 - project-selection follow-up when a WhatsApp user belongs to multiple active projects
 - first live dashboard reporting views for saved progress, manpower, materials, stock, and media records
 - first project-manager analytics cards for progress by area, manpower distribution, stock highlights, and attention items

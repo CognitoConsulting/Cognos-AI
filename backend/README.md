@@ -60,6 +60,7 @@ The first foundation APIs allow platform-admin setup of:
 - reporting record storage for progress, manpower, material transactions, stock balances, and media/proof files
 - first confirmed-save workflow from WhatsApp confirmation replies into reporting records
 - first correction workflow before confirmation-save
+- first missing-information follow-up workflow before confirmation-save
 - project-selection follow-up for users assigned to multiple active projects
 
 During local development, these APIs require:
@@ -130,6 +131,8 @@ Current parser behavior:
 This is a rule-based foundation. External AI model calls will be added later.
 
 The assistant can now save final progress, manpower, and material records after a simple confirmation reply such as `Yes`, `OK`, or `haan`.
+
+If the first message is incomplete, the assistant can now use the next short reply to complete the pending draft. For example, if the user says `cement received`, the assistant can ask for missing quantity/unit, and the user can reply `50 bags`.
 
 Before saving, the user can correct the pending confirmation with replies such as:
 

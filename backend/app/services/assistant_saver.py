@@ -84,6 +84,28 @@ UNIT_TERMS = {
     "pieces",
 }
 
+MATERIAL_TERMS = {
+    "cement",
+    "steel",
+    "brick",
+    "bricks",
+    "sand",
+    "aggregate",
+    "tiles",
+    "paint",
+}
+
+ACTIVITY_TERMS = {
+    "plastering",
+    "plaster",
+    "brickwork",
+    "waterproofing",
+    "painting",
+    "tiling",
+    "excavation",
+    "concreting",
+}
+
 TRADE_TERMS = {
     "mason",
     "helper",
@@ -152,6 +174,76 @@ def apply_pending_confirmation_correction(
         handled=True,
         processing_status="awaiting_confirmation_corrected",
         detail="Assistant confirmation was corrected and is waiting for confirmation again.",
+        reply_text=pending_state.confirmation_prompt,
+    )
+
+
+def apply_missing_information_reply(
+    db: Session,
+    user: User,
+    missing_information_text: str | None,
+) -> ConfirmationSaveResult:
+    pending_state = _find_latest_missing_information_state(db, user)
+    if not pending_state:
+        return ConfirmationSaveResult(
+            handled=False,
+            processing_status="no_pending_missing_information",
+            detail="No pending assistant missing-information request was found for this user.",
+        )
+
+    if pending_state.pending_intent not in {
+        "progress",
+        "manpower",
+        "material_received",
+        "material_issued",
+    }:
+        return ConfirmationSaveResult(
+            handled=False,
+            processing_status="unsupported_missing_information_intent",
+            detail="Pending missing-information state is not an actionable reporting intent.",
+        )
+
+    pending_data = dict(pending_state.pending_data or {})
+    supplied_data = _extract_missing_information(
+        pending_state.pending_intent,
+        pending_state.missing_fields or [],
+        missing_information_text,
+    )
+    pending_state.last_user_message = missing_information_text
+    pending_state.updated_at = datetime.utcnow()
+
+    if supplied_data:
+        pending_data.update(supplied_data)
+        pending_state.pending_data = pending_data
+
+    remaining_missing = _remaining_missing_fields(pending_state.pending_intent, pending_data)
+    pending_state.missing_fields = remaining_missing
+
+    if remaining_missing:
+        pending_state.status = "awaiting_missing_information"
+        pending_state.confirmation_prompt = _build_missing_information_followup_prompt(
+            pending_state.pending_intent,
+            remaining_missing,
+            understood=supplied_data,
+        )
+        db.commit()
+        return ConfirmationSaveResult(
+            handled=True,
+            processing_status="awaiting_missing_information",
+            detail="Assistant missing-information reply was processed, but more fields are still required.",
+            reply_text=pending_state.confirmation_prompt,
+        )
+
+    pending_state.status = "awaiting_confirmation"
+    pending_state.confirmation_prompt = _build_completed_missing_information_prompt(
+        pending_state.pending_intent,
+        pending_data,
+    )
+    db.commit()
+    return ConfirmationSaveResult(
+        handled=True,
+        processing_status="awaiting_confirmation_completed",
+        detail="Assistant missing-information reply completed the pending entry.",
         reply_text=pending_state.confirmation_prompt,
     )
 
@@ -296,6 +388,87 @@ def _find_latest_project_selection_state(
     )
 
 
+def _find_latest_missing_information_state(
+    db: Session,
+    user: User,
+) -> AssistantConversationState | None:
+    return db.scalar(
+        select(AssistantConversationState)
+        .where(AssistantConversationState.company_id == user.company_id)
+        .where(AssistantConversationState.user_id == user.id)
+        .where(AssistantConversationState.status == "awaiting_missing_information")
+        .order_by(AssistantConversationState.updated_at.desc())
+    )
+
+
+def _extract_missing_information(
+    intent: str,
+    missing_fields: list[str],
+    message_text: str | None,
+) -> dict:
+    text = (message_text or "").strip()
+    lowered = text.lower()
+    if not text:
+        return {}
+
+    supplied: dict = {}
+    quantity, unit = _extract_quantity_and_unit(lowered)
+    if "quantity" in missing_fields and quantity is not None:
+        supplied["quantity"] = quantity
+    if "unit" in missing_fields:
+        if unit:
+            supplied["unit"] = unit
+        else:
+            unit_only = _extract_unit_only(lowered)
+            if unit_only:
+                supplied["unit"] = unit_only
+
+    if "location" in missing_fields:
+        location = _extract_named_value(text, ["location", "area", "site"])
+        if not location:
+            location = _extract_location(text)
+        if not location and len(text.split()) <= 6 and not quantity:
+            location = text
+        if location:
+            supplied["location"] = location
+
+    if "activity" in missing_fields and intent == "progress":
+        activity = _extract_named_value(text, ["activity", "work", "kaam"])
+        if not activity:
+            activity = _extract_activity_term(lowered)
+        if activity:
+            supplied["activity"] = activity
+
+    if "material" in missing_fields and intent in {"material_received", "material_issued"}:
+        material = _extract_named_value(text, ["material"])
+        if not material:
+            material = _extract_material_term(lowered)
+        if material:
+            supplied["material"] = material
+
+    if "trade_counts" in missing_fields and intent == "manpower":
+        trade_counts = _extract_trade_counts(lowered)
+        if trade_counts:
+            supplied["trade_counts"] = trade_counts
+
+    return supplied
+
+
+def _remaining_missing_fields(intent: str, pending_data: dict) -> list[str]:
+    required_fields_by_intent = {
+        "progress": ["activity", "quantity", "unit", "location"],
+        "manpower": ["trade_counts", "location"],
+        "material_received": ["material", "quantity", "unit"],
+        "material_issued": ["material", "quantity", "unit"],
+    }
+    remaining = []
+    for field in required_fields_by_intent.get(intent, []):
+        value = pending_data.get(field)
+        if value in [None, "", {}, []]:
+            remaining.append(field)
+    return remaining
+
+
 def _extract_correction(
     intent: str,
     pending_data: dict,
@@ -415,11 +588,51 @@ def _extract_trade_counts(lowered: str) -> dict[str, int]:
     return counts
 
 
+def _extract_material_term(lowered: str) -> str | None:
+    for material in sorted(MATERIAL_TERMS, key=len, reverse=True):
+        if re.search(rf"\b{re.escape(material)}\b", lowered):
+            return material
+    return None
+
+
+def _extract_activity_term(lowered: str) -> str | None:
+    for activity in sorted(ACTIVITY_TERMS, key=len, reverse=True):
+        if re.search(rf"\b{re.escape(activity)}\b", lowered):
+            return "plastering" if activity == "plaster" else activity
+    return None
+
+
 def _build_corrected_confirmation_prompt(intent: str, pending_data: dict) -> str:
     return (
         f"I have updated the {intent.replace('_', ' ')} entry:\n"
         f"{_summarize_pending_data(pending_data)}\n\n"
         "Please reply Yes to save this corrected entry, or tell me what else to change."
+    )
+
+
+def _build_completed_missing_information_prompt(intent: str, pending_data: dict) -> str:
+    return (
+        f"Thanks, I have completed the {intent.replace('_', ' ')} entry:\n"
+        f"{_summarize_pending_data(pending_data)}\n\n"
+        "Please reply Yes to save this entry, or tell me what to change."
+    )
+
+
+def _build_missing_information_followup_prompt(
+    intent: str,
+    remaining_missing: list[str],
+    *,
+    understood: dict,
+) -> str:
+    readable_missing = ", ".join(field.replace("_", " ") for field in remaining_missing)
+    if understood:
+        return (
+            f"Got it. I still need {readable_missing} for this "
+            f"{intent.replace('_', ' ')} entry. Please send that detail."
+        )
+    return (
+        f"I still need {readable_missing} for this {intent.replace('_', ' ')} entry. "
+        "Please send the missing detail in a simple reply."
     )
 
 

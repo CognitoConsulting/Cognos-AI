@@ -507,6 +507,7 @@ Acceptance criteria:
 - dashboard can show assistant parse results, missing fields, and conversation states for owner/admin users
 - first confirmed-save workflow stores progress, manpower, and material records after simple replies like `Yes`, `OK`, or `haan`
 - first correction workflow updates pending confirmations for simple quantity, unit, location, activity, material, and manpower changes before save
+- first missing-information follow-up workflow completes pending drafts from short replies before save
 - project-selection follow-up supports users assigned to multiple active projects
 
 Dependencies:
