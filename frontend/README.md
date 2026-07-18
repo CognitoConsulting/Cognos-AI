@@ -34,6 +34,7 @@ Current live dashboard foundation:
 - lets owner/admin users review company-level inbound/outbound WhatsApp message logs
 - lets owner/admin users add and review WhatsApp provider accounts for local/generic and Meta-style setups
 - lets owner/admin users review assistant parse results, missing fields, and conversation states for pilot debugging
+- lets owner/admin users configure whether the company uses platform-managed AI keys or company-owned AI mode
 
 During local development, run the seed script and use the printed owner email with password `Demo12345!`.
 
@@ -51,6 +52,11 @@ Current project management limitations:
 Current knowledgebase management limitations:
 
 - templates can be downloaded and imported, but imported knowledgebase records are not yet editable from the dashboard
+
+Current AI configuration limitations:
+
+- AI mode and AI insights subscription status can be configured
+- real company-owned API key entry, validation, masking, and encrypted storage are not implemented yet
 
 Current export behavior:
 

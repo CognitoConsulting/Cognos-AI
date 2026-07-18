@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -10,6 +11,11 @@ class CompanyCreate(BaseModel):
     name: str = Field(min_length=2, max_length=255)
     status: str = "active"
     ai_key_mode: str = "platform_managed"
+    ai_subscription_enabled: bool = False
+
+
+class CompanyAISettingsUpdate(BaseModel):
+    ai_key_mode: Literal["platform_managed", "company_owned"] = "platform_managed"
     ai_subscription_enabled: bool = False
 
 

@@ -75,6 +75,7 @@ Current foundation includes:
 - first dashboard WhatsApp audit UI for inbound/outbound message logs and pilot debugging
 - first dashboard WhatsApp provider settings UI for adding and reviewing provider accounts
 - first dashboard assistant audit UI for reviewing parse results, missing fields, and conversation states
+- first company AI settings API and dashboard UI for platform-managed vs company-owned AI mode
 - dependency-free Excel workbook export with separate sheets for reporting data
 - polished reporting workspace with health indicators, row counts, clearer empty states, and role-aware restricted messages
 

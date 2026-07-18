@@ -66,7 +66,7 @@
 - [ ] Admin can upload project knowledgebase.
 - [ ] Admin can see template validation errors.
 - [ ] Admin can view WhatsApp provider settings.
-- [ ] Admin can view or configure AI key mode.
+- [x] Admin can view or configure AI key mode.
 
 ## Data readiness
 
