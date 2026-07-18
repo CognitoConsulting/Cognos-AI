@@ -1,0 +1,10 @@
+{
+  "message_id": "voice-progress-001",
+  "phone": "+919999999999",
+  "provider_account_id": "local-test-account",
+  "type": "voice",
+  "voice_url": "https://example.com/audio/voice-progress-001.ogg",
+  "voice_id": "voice-progress-001-provider-id",
+  "mime_type": "audio/ogg",
+  "transcript": "Aaj Tower A Floor 2 me 50 sqm plaster complete hua"
+}

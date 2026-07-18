@@ -363,6 +363,25 @@ If you run the same webhook test repeatedly, change the `message_id` in the samp
 
 The system treats repeated provider message IDs as duplicates, which is intentional.
 
+Send a generic voice-note webhook with a test transcript:
+
+```bash
+curl -X POST http://localhost:8000/webhooks/whatsapp/generic \
+  -H "Content-Type: application/json" \
+  -d @docs/examples/whatsapp-generic-voice-with-transcript.json
+```
+
+This stores a `voice_notes` audit record. Because the sample includes a transcript, the assistant processes the transcript exactly like typed text.
+
+If a voice/audio payload does not include a transcript, the backend still stores the voice note and replies professionally asking the user to type the update until real transcription is configured.
+
+List stored voice notes:
+
+```bash
+curl http://localhost:8000/companies/<company_id>/whatsapp/voice-notes \
+  -H "X-Platform-Admin-Token: local-dev-platform-admin-token"
+```
+
 Send a Meta-style test webhook:
 
 ```bash
@@ -393,6 +412,8 @@ Current behavior:
 - identifies active users by phone number if already created
 - requires WhatsApp phone numbers to be unique across the platform
 - stores inbound messages for audit
+- stores inbound voice/audio submissions in `voice_notes`
+- processes provider-supplied voice transcripts through the same assistant workflow as typed messages
 - marks messages from unknown numbers as `unknown_user`
 - creates a first assistant parser result
 - creates an assistant conversation state for confirmation, missing information, or professional redirect

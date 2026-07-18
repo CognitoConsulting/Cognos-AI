@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     auth_token_ttl_seconds: int = 60 * 60 * 24
     daily_summary_scheduler_enabled: bool = True
     daily_summary_scheduler_interval_seconds: int = 60
+    voice_transcription_enabled: bool = False
+    voice_transcription_provider: str = "not_configured"
     database_url: str = Field(
         default="postgresql+psycopg://cognos:cognos@db:5432/cognos_ai"
     )

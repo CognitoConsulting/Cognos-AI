@@ -555,6 +555,10 @@ Acceptance criteria:
 - voice is transcribed
 - transcript is processed like text
 - transcript and original media reference are stored
+- first foundation receives generic/Meta-style audio or voice payloads
+- first foundation stores voice/audio references in `voice_notes`
+- first foundation processes provider-supplied/test transcripts through the normal assistant parser
+- real AI transcription provider connection is still future work
 
 Dependencies:
 

@@ -187,3 +187,22 @@ class MediaFileRead(ORMBaseModel):
     processing_status: str
     captured_at: datetime | None
     created_at: datetime
+
+
+class VoiceNoteRead(ORMBaseModel):
+    id: UUID
+    company_id: UUID
+    project_id: UUID | None
+    uploaded_by: UUID | None
+    source_whatsapp_message_id: UUID | None
+    storage_url: str
+    file_name: str | None
+    provider_media_id: str | None
+    mime_type: str | None
+    transcription_status: str
+    transcription_provider: str | None
+    transcript_text: str | None
+    transcript_language: str | None
+    error_message: str | None
+    captured_at: datetime | None
+    created_at: datetime

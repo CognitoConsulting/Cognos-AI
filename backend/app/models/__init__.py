@@ -18,6 +18,7 @@ from app.models.reporting import (
     MaterialTransaction,
     MediaFile,
     ProgressEntry,
+    VoiceNote,
 )
 from app.models.user import User
 from app.models.whatsapp import WhatsAppMessage, WhatsAppProviderAccount
@@ -43,6 +44,7 @@ __all__ = [
     "ProgressEntry",
     "Unit",
     "User",
+    "VoiceNote",
     "WhatsAppMessage",
     "WhatsAppProviderAccount",
 ]

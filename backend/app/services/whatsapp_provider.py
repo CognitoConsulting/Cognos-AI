@@ -22,6 +22,8 @@ class NormalizedInboundMessage:
     media_file_name: str | None
     provider_media_id: str | None
     media_caption: str | None
+    media_mime_type: str | None
+    transcription_text: str | None
     raw_payload: dict[str, Any]
 
 
@@ -171,18 +173,24 @@ def _normalize_generic_payload(
     )
     media_type = _first_text(
         payload.get("media_type"),
-        payload.get("type") if payload.get("type") in {"image", "photo", "video", "document"} else None,
+        payload.get("type")
+        if payload.get("type") in {"image", "photo", "video", "document", "audio", "voice"}
+        else None,
     )
     media_url = _first_text(
         payload.get("media_url"),
         payload.get("storage_url"),
         payload.get("url"),
         payload.get("image_url"),
+        payload.get("audio_url"),
+        payload.get("voice_url"),
     )
     provider_media_id = _first_text(
         payload.get("provider_media_id"),
         payload.get("media_id"),
         payload.get("image_id"),
+        payload.get("audio_id"),
+        payload.get("voice_id"),
     )
     media_caption = _first_text(
         payload.get("caption"),
@@ -192,8 +200,20 @@ def _normalize_generic_payload(
         payload.get("file_name"),
         payload.get("filename"),
     )
+    media_mime_type = _first_text(
+        payload.get("mime_type"),
+        payload.get("media_mime_type"),
+    )
+    transcription_text = _first_text(
+        payload.get("transcript"),
+        payload.get("transcription"),
+        payload.get("transcription_text"),
+        payload.get("voice_transcript"),
+    )
 
-    if not any([message_text, phone, provider_message_id, media_url, provider_media_id]):
+    if not any(
+        [message_text, phone, provider_message_id, media_url, provider_media_id, transcription_text]
+    ):
         return None
 
     return NormalizedInboundMessage(
@@ -207,6 +227,8 @@ def _normalize_generic_payload(
         media_file_name=media_file_name,
         provider_media_id=provider_media_id,
         media_caption=media_caption,
+        media_mime_type=media_mime_type,
+        transcription_text=transcription_text,
         raw_payload=payload,
     )
 
@@ -240,17 +262,25 @@ def _normalize_meta_payload(
     provider_media_id = None
     media_caption = None
     media_file_name = None
+    media_mime_type = None
+    transcription_text = None
     if message_type == "text":
         text_body = (message.get("text") or {}).get("body")
     elif message_type in {"button", "interactive"}:
         text_body = _extract_interactive_text(message)
-    elif message_type in {"image", "video", "document"}:
+    elif message_type in {"image", "video", "document", "audio", "voice"}:
         media_payload = message.get(message_type) or {}
-        media_type = message_type
+        media_type = "voice" if message_type == "audio" and media_payload.get("voice") else message_type
         provider_media_id = _first_text(media_payload.get("id"))
         media_caption = _first_text(media_payload.get("caption"))
         media_file_name = _first_text(media_payload.get("filename"))
         media_url = _first_text(media_payload.get("link"), media_payload.get("url"))
+        media_mime_type = _first_text(media_payload.get("mime_type"))
+        transcription_text = _first_text(
+            media_payload.get("transcript"),
+            media_payload.get("transcription"),
+            media_payload.get("transcription_text"),
+        )
 
     return NormalizedInboundMessage(
         provider_name=_normalize_provider_name(provider_name),
@@ -263,6 +293,8 @@ def _normalize_meta_payload(
         media_file_name=media_file_name,
         provider_media_id=provider_media_id,
         media_caption=media_caption,
+        media_mime_type=media_mime_type,
+        transcription_text=transcription_text,
         raw_payload=payload,
     )
 

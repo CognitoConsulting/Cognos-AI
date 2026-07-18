@@ -141,6 +141,25 @@ type WhatsAppProviderAccount = {
   created_at: string;
 };
 
+type VoiceNote = {
+  id: string;
+  company_id: string;
+  project_id: string | null;
+  uploaded_by: string | null;
+  source_whatsapp_message_id: string | null;
+  storage_url: string;
+  file_name: string | null;
+  provider_media_id: string | null;
+  mime_type: string | null;
+  transcription_status: string;
+  transcription_provider: string | null;
+  transcript_text: string | null;
+  transcript_language: string | null;
+  error_message: string | null;
+  captured_at: string | null;
+  created_at: string;
+};
+
 type AssistantParseResult = {
   id: string;
   company_id: string | null;
@@ -406,6 +425,7 @@ export function App() {
   const [dailySummaryMessages, setDailySummaryMessages] = useState<DailySummaryMessage[]>([]);
   const [whatsAppProviderAccounts, setWhatsAppProviderAccounts] = useState<WhatsAppProviderAccount[]>([]);
   const [whatsAppMessages, setWhatsAppMessages] = useState<WhatsAppAuditMessage[]>([]);
+  const [voiceNotes, setVoiceNotes] = useState<VoiceNote[]>([]);
   const [assistantParseResults, setAssistantParseResults] = useState<AssistantParseResult[]>([]);
   const [assistantConversationStates, setAssistantConversationStates] = useState<
     AssistantConversationState[]
@@ -582,18 +602,21 @@ export function App() {
     if (!selectedCompanyId || !currentUser || !isCompanyAdmin(currentUser.role)) {
       setWhatsAppProviderAccounts([]);
       setWhatsAppMessages([]);
+      setVoiceNotes([]);
       return;
     }
 
     loadWhatsAppWorkspace(selectedCompanyId, accessToken)
-      .then(({ providerAccounts, messages }) => {
+      .then(({ providerAccounts, messages, voiceNotes }) => {
         setWhatsAppProviderAccounts(providerAccounts);
         setWhatsAppMessages(messages);
+        setVoiceNotes(voiceNotes);
         setWhatsAppErrorMessage("");
       })
       .catch((error: Error) => {
         setWhatsAppProviderAccounts([]);
         setWhatsAppMessages([]);
+        setVoiceNotes([]);
         setWhatsAppErrorMessage(error.message);
       });
   }, [selectedCompanyId, currentUser, accessToken]);
@@ -891,14 +914,15 @@ export function App() {
     setWhatsAppMessage("");
     setWhatsAppErrorMessage("");
     try {
-      const { providerAccounts, messages } = await loadWhatsAppWorkspace(
+      const { providerAccounts, messages, voiceNotes } = await loadWhatsAppWorkspace(
         selectedCompanyId,
         accessToken,
       );
       setWhatsAppProviderAccounts(providerAccounts);
       setWhatsAppMessages(messages);
+      setVoiceNotes(voiceNotes);
       setWhatsAppMessage(
-        `Loaded ${providerAccounts.length} provider account(s) and ${messages.length} message(s).`,
+        `Loaded ${providerAccounts.length} provider account(s), ${messages.length} message(s), and ${voiceNotes.length} voice note(s).`,
       );
     } catch (error) {
       setWhatsAppErrorMessage(
@@ -1199,6 +1223,7 @@ export function App() {
             providerAccounts={whatsAppProviderAccounts}
             providerForm={whatsAppProviderForm}
             messages={whatsAppMessages}
+            voiceNotes={voiceNotes}
             whatsAppMessage={whatsAppMessage}
             whatsAppErrorMessage={whatsAppErrorMessage}
             onProviderFormChange={setWhatsAppProviderForm}
@@ -2073,6 +2098,7 @@ function WhatsAppAuditPanel({
   providerAccounts,
   providerForm,
   messages,
+  voiceNotes,
   whatsAppMessage,
   whatsAppErrorMessage,
   onProviderFormChange,
@@ -2082,6 +2108,7 @@ function WhatsAppAuditPanel({
   providerAccounts: WhatsAppProviderAccount[];
   providerForm: typeof emptyWhatsAppProviderForm;
   messages: WhatsAppAuditMessage[];
+  voiceNotes: VoiceNote[];
   whatsAppMessage: string;
   whatsAppErrorMessage: string;
   onProviderFormChange: (form: typeof emptyWhatsAppProviderForm) => void;
@@ -2221,6 +2248,20 @@ function WhatsAppAuditPanel({
           formatRole(message.processing_status),
           message.provider_name,
           truncateText(message.message_text ?? "-", 90),
+        ])}
+      />
+
+      <ReportingTable
+        title="Voice note log"
+        emptyMessage="No WhatsApp voice notes have been logged for this company yet."
+        helper="Voice/audio submissions, transcript status, and transcript text when available."
+        columns={["Created", "Status", "Provider", "Transcript", "Media"]}
+        rows={voiceNotes.map((voiceNote) => [
+          formatDateTime(voiceNote.created_at),
+          formatRole(voiceNote.transcription_status),
+          voiceNote.transcription_provider ?? "-",
+          truncateText(voiceNote.transcript_text ?? voiceNote.error_message ?? "-", 90),
+          voiceNote.file_name ?? voiceNote.provider_media_id ?? voiceNote.storage_url,
         ])}
       />
     </section>
@@ -2854,18 +2895,30 @@ async function loadWhatsAppProviderAccounts(
   );
 }
 
+async function loadVoiceNotes(
+  companyId: string,
+  accessToken: string,
+): Promise<VoiceNote[]> {
+  return apiRequest<VoiceNote[]>(
+    `/api/companies/${companyId}/whatsapp/voice-notes`,
+    accessToken,
+  );
+}
+
 async function loadWhatsAppWorkspace(
   companyId: string,
   accessToken: string,
 ): Promise<{
   providerAccounts: WhatsAppProviderAccount[];
   messages: WhatsAppAuditMessage[];
+  voiceNotes: VoiceNote[];
 }> {
-  const [providerAccounts, messages] = await Promise.all([
+  const [providerAccounts, messages, voiceNotes] = await Promise.all([
     loadWhatsAppProviderAccounts(companyId, accessToken),
     loadWhatsAppMessages(companyId, accessToken),
+    loadVoiceNotes(companyId, accessToken),
   ]);
-  return { providerAccounts, messages };
+  return { providerAccounts, messages, voiceNotes };
 }
 
 async function loadAssistantParseResults(
