@@ -886,7 +886,8 @@ def _capture_voice_note_if_possible(
     if not is_voice_media_type(normalized.media_type):
         return None
 
-    transcription = transcribe_voice_note(normalized)
+    company = db.get(Company, user.company_id)
+    transcription = transcribe_voice_note(normalized, company)
     project = _single_project_available_to_user(db, user)
     voice_note = VoiceNote(
         company_id=user.company_id,
@@ -922,23 +923,10 @@ def _capture_voice_note_if_possible(
             "audit_payload": audit_payload,
         }
 
-    if transcription.status == "queued":
-        reply_text = (
-            "Received your voice note. Voice transcription is not fully connected yet, "
-            "so I have stored it for audit. Please type the update for now so I can record it."
-        )
-        processing_status = "voice_transcription_pending"
-    else:
-        reply_text = (
-            "Received your voice note, but voice transcription is not configured yet. "
-            "Please type the update for now, or ask your admin to enable voice transcription."
-        )
-        processing_status = "voice_transcription_not_configured"
-
     return {
-        "processing_status": processing_status,
+        "processing_status": f"voice_{transcription.status}",
         "detail": "Inbound WhatsApp voice note was stored, but no transcript was available.",
-        "reply_text": reply_text,
+        "reply_text": _voice_transcription_unavailable_reply(transcription.status),
         "audit_payload": audit_payload,
     }
 
@@ -946,6 +934,38 @@ def _capture_voice_note_if_possible(
 def _single_project_available_to_user(db: Session, user: User) -> Project | None:
     projects = _projects_available_to_user(db, user)
     return projects[0] if len(projects) == 1 else None
+
+
+def _voice_transcription_unavailable_reply(status: str) -> str:
+    if status == "unsupported_format":
+        return (
+            "Received your voice note, but this audio format needs conversion before I can "
+            "transcribe it. Please type the update for now so I can record it."
+        )
+    if status == "media_unavailable":
+        return (
+            "Received your voice note, but I only received the provider media reference, not a "
+            "downloadable audio file. Please type the update for now so I can record it."
+        )
+    if status in {"platform_key_not_configured", "company_key_not_configured", "not_configured"}:
+        return (
+            "Received your voice note, but voice transcription is not configured yet. "
+            "Please type the update for now, or ask your admin to enable voice transcription."
+        )
+    if status == "download_failed":
+        return (
+            "Received your voice note, but I could not download the audio for transcription. "
+            "Please type the update for now so I can record it."
+        )
+    if status == "transcription_failed":
+        return (
+            "Received your voice note, but transcription failed. Please type the update for now "
+            "so I can record it."
+        )
+    return (
+        "Received your voice note. I have stored it for audit, but transcription is not ready yet. "
+        "Please type the update for now so I can record it."
+    )
 
 
 def _projects_available_to_user(db: Session, user: User) -> list[Project]:

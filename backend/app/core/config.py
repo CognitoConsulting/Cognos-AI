@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     daily_summary_scheduler_interval_seconds: int = 60
     voice_transcription_enabled: bool = False
     voice_transcription_provider: str = "not_configured"
+    openai_api_key: SecretStr | None = None
+    openai_transcription_model: str = "gpt-4o-mini-transcribe"
+    voice_transcription_max_bytes: int = 25 * 1024 * 1024
+    voice_transcription_download_timeout_seconds: int = 20
     database_url: str = Field(
         default="postgresql+psycopg://cognos:cognos@db:5432/cognos_ai"
     )

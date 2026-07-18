@@ -60,6 +60,7 @@ The first foundation APIs allow platform-admin setup of:
 - reporting record storage for progress, manpower, material transactions, stock balances, and media/proof files
 - WhatsApp image/proof capture into `media_files` for users with one active project
 - WhatsApp voice-note capture into `voice_notes`, with provider-supplied transcripts processed like text
+- OpenAI transcription adapter for supported downloadable voice/audio files
 - first confirmed-save workflow from WhatsApp confirmation replies into reporting records
 - first correction workflow before confirmation-save
 - first missing-information follow-up workflow before confirmation-save
@@ -120,6 +121,24 @@ When a photo/proof arrives within 30 minutes of the same user's latest saved pro
 This media foundation stores the supplied media URL or provider media reference. It does not yet download provider media into long-term object storage.
 
 For voice notes, the webhook creates a `voice_notes` audit record. If the inbound provider or test payload includes a transcript, that transcript is processed through the same assistant workflow as a typed WhatsApp message. If no transcript is available, the voice note is stored and the user is asked to type the update until real transcription is configured.
+
+If `VOICE_TRANSCRIPTION_ENABLED=true`, `VOICE_TRANSCRIPTION_PROVIDER=openai`, and the correct OpenAI key is available, the backend can download supported audio files and send them to OpenAI's Audio Transcriptions API. The default model is `gpt-4o-mini-transcribe`.
+
+Platform-managed AI mode uses `OPENAI_API_KEY`.
+
+Company-owned AI mode does not store raw keys in the database. For local/pilot testing, provide the key as:
+
+```text
+COGNOS_COMPANY_OPENAI_API_KEY_<COMPANY_ID_WITH_HYPHENS_REPLACED_BY_UNDERSCORES>
+```
+
+Example:
+
+```text
+COGNOS_COMPANY_OPENAI_API_KEY_11111111_1111_1111_1111_111111111111
+```
+
+The current adapter supports downloadable files in OpenAI-supported formats such as flac, mp3, mp4, mpeg, mpga, m4a, ogg, wav, and webm. If the selected WhatsApp provider sends only a media ID instead of a downloadable URL, provider-specific media download still needs to be added.
 
 The webhook also creates a first parser result in `assistant_parse_results`.
 It now creates a conversation state in `assistant_conversation_states` so the next step is visible:
