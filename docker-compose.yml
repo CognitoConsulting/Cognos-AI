@@ -34,6 +34,7 @@ services:
       - ./backend/app:/app/app
       - ./backend/migrations:/app/migrations
       - ./backend/alembic.ini:/app/alembic.ini
+      - ./media:/app/media
     depends_on:
       db:
         condition: service_healthy

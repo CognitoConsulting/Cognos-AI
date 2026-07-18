@@ -62,6 +62,7 @@ The first foundation APIs allow platform-admin setup of:
 - WhatsApp voice-note capture into `voice_notes`, with provider-supplied transcripts processed like text
 - OpenAI transcription adapter for supported downloadable voice/audio files
 - Meta WhatsApp media-ID URL resolution for inbound media/voice references
+- local object-storage-style persistence for inbound WhatsApp media files
 - first confirmed-save workflow from WhatsApp confirmation replies into reporting records
 - first correction workflow before confirmation-save
 - first missing-information follow-up workflow before confirmation-save
@@ -141,6 +142,18 @@ META_WHATSAPP_ACCESS_TOKEN_<PHONE_NUMBER_ID_OR_PROVIDER_ACCOUNT_ID>
 
 The resolved Meta media URL is treated as runtime-only. It is not stored permanently in `media_files`, `voice_notes`, or the Cognos audit payload because Meta media URLs are short-lived and should be treated as sensitive.
 
+Inbound WhatsApp media is now persisted through a provider-neutral storage adapter. The local development provider writes files under `MEDIA_STORAGE_LOCAL_ROOT`, which defaults to `media`, and stores durable `storage://local/...` references in `media_files` and `voice_notes`.
+
+Local media storage settings:
+
+```text
+MEDIA_STORAGE_PROVIDER=local_filesystem
+MEDIA_STORAGE_LOCAL_ROOT=media
+MEDIA_STORAGE_MAX_BYTES=104857600
+```
+
+The storage layer is intentionally separate from WhatsApp and OpenAI. Later, `local_filesystem` can be replaced with S3, Cloudflare R2, Azure Blob, or another object storage provider without changing the user-facing WhatsApp workflow.
+
 Platform-managed AI mode uses `OPENAI_API_KEY`.
 
 Company-owned AI mode does not store raw keys in the database. For local/pilot testing, provide the key as:
@@ -155,7 +168,7 @@ Example:
 COGNOS_COMPANY_OPENAI_API_KEY_11111111_1111_1111_1111_111111111111
 ```
 
-The current adapter supports downloadable files in OpenAI-supported formats such as flac, mp3, mp4, mpeg, mpga, m4a, ogg, wav, and webm. Long-term object storage for downloaded media is still future work.
+The current adapter supports downloadable files in OpenAI-supported formats such as flac, mp3, mp4, mpeg, mpga, m4a, ogg, wav, and webm. Cloud object storage such as S3/R2/Azure Blob is still future work; the MVP foundation uses local object-storage-style persistence.
 
 The webhook also creates a first parser result in `assistant_parse_results`.
 It now creates a conversation state in `assistant_conversation_states` so the next step is visible:

@@ -28,6 +28,10 @@ class Settings(BaseSettings):
     meta_whatsapp_access_token: SecretStr | None = None
     meta_graph_api_version: str = "v23.0"
     whatsapp_media_download_timeout_seconds: int = 20
+    media_storage_provider: str = "local_filesystem"
+    media_storage_local_root: str = "media"
+    media_storage_max_bytes: int = 100 * 1024 * 1024
+    media_storage_download_timeout_seconds: int = 30
     database_url: str = Field(
         default="postgresql+psycopg://cognos:cognos@db:5432/cognos_ai"
     )
