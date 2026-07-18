@@ -91,6 +91,7 @@ Current foundation includes:
 - first company AI settings API and dashboard UI for platform-managed vs company-owned AI mode
 - dependency-free Excel workbook export with separate sheets for reporting data
 - polished reporting workspace with health indicators, row counts, clearer empty states, and role-aware restricted messages
+- backend date-range filters for project reporting APIs used by the dashboard
 
 ## Planned architecture
 

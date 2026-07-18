@@ -58,6 +58,7 @@ The first foundation APIs allow platform-admin setup of:
 - first assistant parser result storage
 - assistant conversation state storage for confirmation or missing-information follow-up
 - reporting record storage for progress, manpower, material transactions, stock balances, and media/proof files
+- date-range filtering for progress, manpower, material transaction, and media/proof reporting lists
 - WhatsApp image/proof capture into `media_files` for users with one active project
 - WhatsApp voice-note capture into `voice_notes`, with provider-supplied transcripts processed like text
 - OpenAI transcription adapter for supported downloadable voice/audio files

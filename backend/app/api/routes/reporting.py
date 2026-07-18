@@ -1,3 +1,4 @@
+from datetime import date, datetime, time, timedelta
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -71,6 +72,8 @@ def create_progress_entry(
 def list_progress_entries(
     company_id: UUID,
     project_id: UUID,
+    from_date: date | None = None,
+    to_date: date | None = None,
     auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_database_session),
 ) -> list[ProgressEntry]:
@@ -81,12 +84,16 @@ def list_progress_entries(
         auth,
         "progress",
     )
+    _validate_date_range(from_date, to_date)
+    query = (
+        select(ProgressEntry)
+        .where(ProgressEntry.company_id == company_id)
+        .where(ProgressEntry.project_id == project_id)
+    )
+    query = _apply_date_range(query, ProgressEntry.work_date, from_date, to_date)
     return list(
         db.scalars(
-            select(ProgressEntry)
-            .where(ProgressEntry.company_id == company_id)
-            .where(ProgressEntry.project_id == project_id)
-            .order_by(ProgressEntry.work_date.desc(), ProgressEntry.created_at.desc())
+            query.order_by(ProgressEntry.work_date.desc(), ProgressEntry.created_at.desc())
         ).all()
     )
 
@@ -113,6 +120,8 @@ def create_manpower_entry(
 def list_manpower_entries(
     company_id: UUID,
     project_id: UUID,
+    from_date: date | None = None,
+    to_date: date | None = None,
     auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_database_session),
 ) -> list[ManpowerEntry]:
@@ -123,12 +132,16 @@ def list_manpower_entries(
         auth,
         "manpower",
     )
+    _validate_date_range(from_date, to_date)
+    query = (
+        select(ManpowerEntry)
+        .where(ManpowerEntry.company_id == company_id)
+        .where(ManpowerEntry.project_id == project_id)
+    )
+    query = _apply_date_range(query, ManpowerEntry.work_date, from_date, to_date)
     return list(
         db.scalars(
-            select(ManpowerEntry)
-            .where(ManpowerEntry.company_id == company_id)
-            .where(ManpowerEntry.project_id == project_id)
-            .order_by(ManpowerEntry.work_date.desc(), ManpowerEntry.trade_name)
+            query.order_by(ManpowerEntry.work_date.desc(), ManpowerEntry.trade_name)
         ).all()
     )
 
@@ -162,6 +175,8 @@ def create_material_transaction(
 def list_material_transactions(
     company_id: UUID,
     project_id: UUID,
+    from_date: date | None = None,
+    to_date: date | None = None,
     auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_database_session),
 ) -> list[MaterialTransaction]:
@@ -172,12 +187,21 @@ def list_material_transactions(
         auth,
         "materials",
     )
+    _validate_date_range(from_date, to_date)
+    query = (
+        select(MaterialTransaction)
+        .where(MaterialTransaction.company_id == company_id)
+        .where(MaterialTransaction.project_id == project_id)
+    )
+    query = _apply_date_range(
+        query,
+        MaterialTransaction.transaction_date,
+        from_date,
+        to_date,
+    )
     return list(
         db.scalars(
-            select(MaterialTransaction)
-            .where(MaterialTransaction.company_id == company_id)
-            .where(MaterialTransaction.project_id == project_id)
-            .order_by(
+            query.order_by(
                 MaterialTransaction.transaction_date.desc(),
                 MaterialTransaction.created_at.desc(),
             )
@@ -258,16 +282,22 @@ def create_media_file(
 def list_media_files(
     company_id: UUID,
     project_id: UUID,
+    from_date: date | None = None,
+    to_date: date | None = None,
     auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_database_session),
 ) -> list[MediaFile]:
     require_project_dashboard_access(db, company_id, project_id, auth)
+    _validate_date_range(from_date, to_date)
+    query = (
+        select(MediaFile)
+        .where(MediaFile.company_id == company_id)
+        .where(MediaFile.project_id == project_id)
+    )
+    query = _apply_datetime_date_range(query, MediaFile.created_at, from_date, to_date)
     return list(
         db.scalars(
-            select(MediaFile)
-            .where(MediaFile.company_id == company_id)
-            .where(MediaFile.project_id == project_id)
-            .order_by(MediaFile.created_at.desc())
+            query.order_by(MediaFile.created_at.desc())
         ).all()
     )
 
@@ -323,6 +353,30 @@ def _validate_common_references(
         _require_location_in_project(db, company_id, project_id, payload.area_id)
     if getattr(payload, "sub_area_id", None):
         _require_location_in_project(db, company_id, project_id, payload.sub_area_id)
+
+
+def _validate_date_range(from_date: date | None, to_date: date | None) -> None:
+    if from_date and to_date and from_date > to_date:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="from_date must be on or before to_date.",
+        )
+
+
+def _apply_date_range(query, field, from_date: date | None, to_date: date | None):
+    if from_date:
+        query = query.where(field >= from_date)
+    if to_date:
+        query = query.where(field <= to_date)
+    return query
+
+
+def _apply_datetime_date_range(query, field, from_date: date | None, to_date: date | None):
+    if from_date:
+        query = query.where(field >= datetime.combine(from_date, time.min))
+    if to_date:
+        query = query.where(field < datetime.combine(to_date + timedelta(days=1), time.min))
+    return query
 
 
 def _commit[T](db: Session, entity: T) -> T:

@@ -512,7 +512,7 @@ export function App() {
     }
 
     setLoadingMessage("Loading reporting records...");
-    loadReportingData(selectedCompanyId, selectedProjectId, accessToken)
+    loadReportingData(selectedCompanyId, selectedProjectId, accessToken, fromDate, toDate)
       .then((data) => {
         setReportingData(data);
         setErrorMessage("");
@@ -522,7 +522,7 @@ export function App() {
         setLoadingMessage("");
         setErrorMessage(error.message);
       });
-  }, [selectedCompanyId, selectedProjectId, accessToken]);
+  }, [selectedCompanyId, selectedProjectId, accessToken, fromDate, toDate]);
 
   useEffect(() => {
     if (!selectedCompanyId || !currentUser || !isCompanyAdmin(currentUser.role)) {
@@ -3229,13 +3229,24 @@ async function loadReportingData(
   companyId: string,
   projectId: string,
   accessToken: string,
+  fromDate = "",
+  toDate = "",
 ): Promise<ReportingData> {
   const basePath = `/api/companies/${companyId}/projects/${projectId}/reporting`;
+  const dateRangeQuery = reportingDateRangeQuery(fromDate, toDate);
   const [progress, manpower, materials, stock, media] = await Promise.all([
-    optionalApiRequest<ProgressEntry[]>(`${basePath}/progress-entries`, accessToken, []),
-    optionalApiRequest<ManpowerEntry[]>(`${basePath}/manpower-entries`, accessToken, []),
+    optionalApiRequest<ProgressEntry[]>(
+      `${basePath}/progress-entries${dateRangeQuery}`,
+      accessToken,
+      [],
+    ),
+    optionalApiRequest<ManpowerEntry[]>(
+      `${basePath}/manpower-entries${dateRangeQuery}`,
+      accessToken,
+      [],
+    ),
     optionalApiRequest<MaterialTransaction[]>(
-      `${basePath}/material-transactions`,
+      `${basePath}/material-transactions${dateRangeQuery}`,
       accessToken,
       [],
     ),
@@ -3244,7 +3255,11 @@ async function loadReportingData(
       accessToken,
       [],
     ),
-    optionalApiRequest<MediaFile[]>(`${basePath}/media-files`, accessToken, []),
+    optionalApiRequest<MediaFile[]>(
+      `${basePath}/media-files${dateRangeQuery}`,
+      accessToken,
+      [],
+    ),
   ]);
 
   return {
@@ -3261,6 +3276,18 @@ async function loadReportingData(
       media: media.available,
     },
   };
+}
+
+function reportingDateRangeQuery(fromDate: string, toDate: string): string {
+  const params = new URLSearchParams();
+  if (fromDate) {
+    params.set("from_date", fromDate);
+  }
+  if (toDate) {
+    params.set("to_date", toDate);
+  }
+  const query = params.toString();
+  return query ? `?${query}` : "";
 }
 
 async function optionalApiRequest<T>(
