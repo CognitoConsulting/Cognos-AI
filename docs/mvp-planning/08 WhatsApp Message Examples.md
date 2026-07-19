@@ -141,15 +141,65 @@ Aaj Tower A Floor 2 me 50 sqm plaster complete hua.
 Assistant:
 
 ```text
-Please confirm this entry:
+Got it. I read this as progress: plastering, 50 sqm at Tower A Floor 2.
 
-Project: Tower A project
-Location: Tower A, Floor 2
-Activity: Plastering
-Quantity: 50 sqm
-Date: Today
+Your message: Aaj Tower A Floor 2 me 50 sqm plaster complete hua.
 
-Reply Yes to save, or tell me what to change.
+Reply Yes to save this entry, or send a correction like "change quantity to 60".
+```
+
+## Construction vocabulary examples
+
+The assistant should understand common contractor/site language, including:
+
+```text
+Tower A slab casting 35 cum completed today
+```
+
+Expected assistant summary:
+
+```text
+Got it. I read this as progress: slab casting, 35 cum at Tower A.
+```
+
+```text
+RCC work 20 cum done at Block B
+```
+
+Expected assistant summary:
+
+```text
+Got it. I read this as progress: concreting, 20 cum at Block B.
+```
+
+```text
+Shuttering completed 200 sqft at Tower C Floor 1
+```
+
+Expected assistant summary:
+
+```text
+Got it. I read this as progress: shuttering, 200 sqft at Tower C Floor 1.
+```
+
+```text
+TMT 500 kg received at Tower A
+```
+
+Expected assistant summary:
+
+```text
+Got it. I read this as material received: 500 kg of steel at Tower A.
+```
+
+```text
+Labour 15 and mason 6 at Tower A
+```
+
+Expected assistant summary:
+
+```text
+Got it. I read this as manpower: 15 labour, 6 mason at Tower A.
 ```
 
 ## Daily WhatsApp summary example
@@ -183,7 +233,7 @@ If a user sends obscene, offensive, or irrelevant content, the assistant should 
 Example response:
 
 ```text
-I can help with project updates such as progress, manpower, materials, and site images. Please share the site update you want to record.
+I can help record site progress, manpower, material movement, and proofs. Please send the project update in simple work-related language.
 ```
 
 ## Parser requirements

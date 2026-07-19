@@ -35,7 +35,10 @@ def build_conversation_decision(
             missing_fields=[],
             confirmation_prompt=(
                 parse_result.assistant_summary
-                or "Please share a site update related to progress, manpower, materials, or photos."
+                or (
+                    "Please share a work-related site update for progress, manpower, "
+                    "materials, or proofs."
+                )
             ),
         )
 
@@ -47,7 +50,10 @@ def build_conversation_decision(
             missing_fields=parse_result.missing_fields,
             confirmation_prompt=(
                 parse_result.assistant_summary
-                or "What would you like to record: progress, manpower, material received, or material issued?"
+                or (
+                    "I can record progress, manpower, material received, material issued, "
+                    "or site proofs. What would you like to update?"
+                )
             ),
         )
 
@@ -73,8 +79,8 @@ def _build_missing_information_prompt(parse_result: AssistantParseResult) -> str
     readable_intent = _readable_intent(parse_result.intent)
     readable_missing = ", ".join(_humanize_field(field) for field in parse_result.missing_fields)
     return (
-        f"I understood this as a {readable_intent} update, but I still need: "
-        f"{readable_missing}. Please send the missing details and I will complete the entry."
+        f"I understood this as a {readable_intent} update. I still need "
+        f"{readable_missing}. Please reply with just the missing detail."
     )
 
 
@@ -83,11 +89,11 @@ def _build_confirmation_prompt(
     user_message: str | None,
 ) -> str:
     readable_intent = _readable_intent(parse_result.intent)
-    summary = parse_result.assistant_summary or f"{readable_intent.title()} update detected."
-    original = f"\n\nOriginal message: {user_message.strip()}" if user_message else ""
+    summary = parse_result.assistant_summary or f"I read this as a {readable_intent} update."
+    original = f"\n\nYour message: {user_message.strip()}" if user_message else ""
     return (
-        f"{summary}{original}\n\n"
-        "Please reply Yes to save this entry, or tell me what to change."
+        f"Got it. {summary}{original}\n\n"
+        "Reply Yes to save this entry, or send a correction like \"change quantity to 60\"."
     )
 
 
@@ -105,7 +111,7 @@ def _humanize_field(field: str) -> str:
     labels = {
         "activity": "activity or work item",
         "quantity": "quantity",
-        "unit": "unit",
+        "unit": "the unit",
         "location": "location or area",
         "trade_counts": "number of workers by trade",
         "material": "material name",
