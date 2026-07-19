@@ -722,6 +722,7 @@ Acceptance criteria:
 - dashboard reporting requests use the MVP page size for each paged reporting section
 - dashboard tells users that reporting views and exports currently use the visible paged records
 - dashboard users can move through reporting pages with Previous/Next controls per reporting section
+- reporting APIs expose total-count endpoints so the dashboard can show exact page ranges and disable Next at the real end
 - filters support user, activity, and material where relevant
 
 Dependencies:
