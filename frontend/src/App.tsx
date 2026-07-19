@@ -279,6 +279,10 @@ type ReportingAccess = {
   media: boolean;
 };
 
+type ReportingSectionId = "progress" | "manpower" | "materials" | "stock" | "media";
+
+type ReportingPagination = Record<ReportingSectionId, number>;
+
 type AnalyticsRow = {
   label: string;
   value: string;
@@ -350,6 +354,14 @@ const emptyReportingData: ReportingData = {
   access: noReportingAccess,
 };
 
+const emptyReportingPagination: ReportingPagination = {
+  progress: 0,
+  manpower: 0,
+  materials: 0,
+  stock: 0,
+  media: 0,
+};
+
 const emptyNewUserForm = {
   name: "",
   phone: "",
@@ -413,6 +425,8 @@ export function App() {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [reportingData, setReportingData] = useState<ReportingData>(emptyReportingData);
+  const [reportingPagination, setReportingPagination] =
+    useState<ReportingPagination>(emptyReportingPagination);
   const [companyUsers, setCompanyUsers] = useState<CompanyUser[]>([]);
   const [projectAssignments, setProjectAssignments] = useState<ProjectAssignment[]>([]);
   const [knowledgeUploads, setKnowledgeUploads] = useState<ProjectKnowledgeUpload[]>([]);
@@ -513,7 +527,14 @@ export function App() {
     }
 
     setLoadingMessage("Loading reporting records...");
-    loadReportingData(selectedCompanyId, selectedProjectId, accessToken, fromDate, toDate)
+    loadReportingData(
+      selectedCompanyId,
+      selectedProjectId,
+      accessToken,
+      fromDate,
+      toDate,
+      reportingPagination,
+    )
       .then((data) => {
         setReportingData(data);
         setErrorMessage("");
@@ -523,7 +544,7 @@ export function App() {
         setLoadingMessage("");
         setErrorMessage(error.message);
       });
-  }, [selectedCompanyId, selectedProjectId, accessToken, fromDate, toDate]);
+  }, [selectedCompanyId, selectedProjectId, accessToken, fromDate, toDate, reportingPagination]);
 
   useEffect(() => {
     if (!selectedCompanyId || !currentUser || !isCompanyAdmin(currentUser.role)) {
@@ -691,6 +712,21 @@ export function App() {
     localStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY);
     setAccessToken("");
     setCurrentUser(null);
+  }
+
+  function resetReportingPagination() {
+    setReportingPagination(emptyReportingPagination);
+  }
+
+  function handleReportingPageChange(sectionId: ReportingSectionId, direction: "previous" | "next") {
+    setReportingPagination((currentPagination) => ({
+      ...currentPagination,
+      [sectionId]: Math.max(
+        0,
+        currentPagination[sectionId] +
+          (direction === "next" ? REPORTING_PAGE_LIMIT : -REPORTING_PAGE_LIMIT),
+      ),
+    }));
   }
 
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
@@ -1186,7 +1222,10 @@ export function App() {
               Company
               <select
                 value={selectedCompanyId}
-                onChange={(event) => setSelectedCompanyId(event.target.value)}
+                onChange={(event) => {
+                  resetReportingPagination();
+                  setSelectedCompanyId(event.target.value);
+                }}
               >
                 {companies.length === 0 ? <option value="">No companies yet</option> : null}
                 {companies.map((company) => (
@@ -1201,7 +1240,10 @@ export function App() {
               Project
               <select
                 value={selectedProjectId}
-                onChange={(event) => setSelectedProjectId(event.target.value)}
+                onChange={(event) => {
+                  resetReportingPagination();
+                  setSelectedProjectId(event.target.value);
+                }}
               >
                 {projects.length === 0 ? <option value="">No projects yet</option> : null}
                 {projects.map((project) => (
@@ -1219,7 +1261,10 @@ export function App() {
                 <input
                   type="date"
                   value={fromDate}
-                  onChange={(event) => setFromDate(event.target.value)}
+                  onChange={(event) => {
+                    resetReportingPagination();
+                    setFromDate(event.target.value);
+                  }}
                 />
               </label>
               <label>
@@ -1227,7 +1272,10 @@ export function App() {
                 <input
                   type="date"
                   value={toDate}
-                  onChange={(event) => setToDate(event.target.value)}
+                  onChange={(event) => {
+                    resetReportingPagination();
+                    setToDate(event.target.value);
+                  }}
                 />
               </label>
             </div>
@@ -1354,10 +1402,10 @@ export function App() {
 
         <section className="info-banner" aria-label="Reporting data limit notice">
           <div>
-            <strong>Showing the latest {REPORTING_PAGE_LIMIT} records per reporting section.</strong>
+            <strong>Showing {REPORTING_PAGE_LIMIT} records per reporting page.</strong>
             <p>
-              Date filters are applied by the backend first. Full page-by-page navigation is planned
-              after the MVP data model settles.
+              Date filters are applied by the backend first. Use Previous and Next below each
+              section to move through older reporting records.
             </p>
           </div>
         </section>
@@ -1424,8 +1472,8 @@ export function App() {
             <h3>Export</h3>
             <p>
               Download the currently loaded records as one Excel workbook with separate sheets for
-              each report section you can access. The MVP export uses the same latest{" "}
-              {REPORTING_PAGE_LIMIT}-record cap as the dashboard view.
+              each report section you can access. The MVP export uses the currently visible page
+              for each reporting section.
             </p>
             <div className="button-row">
               <button
@@ -1453,19 +1501,27 @@ export function App() {
         </section>
 
         {filteredData.access.progress ? (
-          <ReportingTable
-            title="Progress"
-            emptyMessage="No confirmed progress entries for this selection yet."
-            helper="Confirmed progress updates from WhatsApp or reporting APIs."
-            columns={["Date", "Activity", "Location", "Quantity", "Status"]}
-            rows={filteredData.progress.map((entry) => [
-              entry.work_date,
-              entry.activity_name,
-              entry.location_text ?? "-",
-              `${entry.quantity} ${entry.unit_symbol ?? ""}`.trim(),
-              entry.status,
-            ])}
-          />
+          <PaginatedReportSection
+            sectionLabel="Progress"
+            offset={reportingPagination.progress}
+            rowCount={filteredData.progress.length}
+            onPrevious={() => handleReportingPageChange("progress", "previous")}
+            onNext={() => handleReportingPageChange("progress", "next")}
+          >
+            <ReportingTable
+              title="Progress"
+              emptyMessage="No confirmed progress entries for this selection yet."
+              helper="Confirmed progress updates from WhatsApp or reporting APIs."
+              columns={["Date", "Activity", "Location", "Quantity", "Status"]}
+              rows={filteredData.progress.map((entry) => [
+                entry.work_date,
+                entry.activity_name,
+                entry.location_text ?? "-",
+                `${entry.quantity} ${entry.unit_symbol ?? ""}`.trim(),
+                entry.status,
+              ])}
+            />
+          </PaginatedReportSection>
         ) : (
           <RestrictedPanel
             title="Progress"
@@ -1474,19 +1530,27 @@ export function App() {
         )}
 
         {filteredData.access.manpower ? (
-          <ReportingTable
-            title="Manpower"
-            emptyMessage="No manpower entries for this selection yet."
-            helper="Labor counts grouped by date, trade, and location."
-            columns={["Date", "Trade", "Workers", "Location", "Status"]}
-            rows={filteredData.manpower.map((entry) => [
-              entry.work_date,
-              entry.trade_name,
-              String(entry.worker_count),
-              entry.location_text ?? "-",
-              entry.status,
-            ])}
-          />
+          <PaginatedReportSection
+            sectionLabel="Manpower"
+            offset={reportingPagination.manpower}
+            rowCount={filteredData.manpower.length}
+            onPrevious={() => handleReportingPageChange("manpower", "previous")}
+            onNext={() => handleReportingPageChange("manpower", "next")}
+          >
+            <ReportingTable
+              title="Manpower"
+              emptyMessage="No manpower entries for this selection yet."
+              helper="Labor counts grouped by date, trade, and location."
+              columns={["Date", "Trade", "Workers", "Location", "Status"]}
+              rows={filteredData.manpower.map((entry) => [
+                entry.work_date,
+                entry.trade_name,
+                String(entry.worker_count),
+                entry.location_text ?? "-",
+                entry.status,
+              ])}
+            />
+          </PaginatedReportSection>
         ) : (
           <RestrictedPanel
             title="Manpower"
@@ -1495,20 +1559,28 @@ export function App() {
         )}
 
         {filteredData.access.materials ? (
-          <ReportingTable
-            title="Material movement"
-            emptyMessage="No material transactions for this selection yet."
-            helper="Material received and issued records, including proof status."
-            columns={["Date", "Type", "Material", "Quantity", "Location", "Proof"]}
-            rows={filteredData.materials.map((entry) => [
-              entry.transaction_date,
-              entry.transaction_type,
-              entry.material_name,
-              `${entry.quantity} ${entry.unit_symbol ?? ""}`.trim(),
-              entry.location_text ?? "-",
-              entry.proof_status,
-            ])}
-          />
+          <PaginatedReportSection
+            sectionLabel="Material movement"
+            offset={reportingPagination.materials}
+            rowCount={filteredData.materials.length}
+            onPrevious={() => handleReportingPageChange("materials", "previous")}
+            onNext={() => handleReportingPageChange("materials", "next")}
+          >
+            <ReportingTable
+              title="Material movement"
+              emptyMessage="No material transactions for this selection yet."
+              helper="Material received and issued records, including proof status."
+              columns={["Date", "Type", "Material", "Quantity", "Location", "Proof"]}
+              rows={filteredData.materials.map((entry) => [
+                entry.transaction_date,
+                entry.transaction_type,
+                entry.material_name,
+                `${entry.quantity} ${entry.unit_symbol ?? ""}`.trim(),
+                entry.location_text ?? "-",
+                entry.proof_status,
+              ])}
+            />
+          </PaginatedReportSection>
         ) : (
           <RestrictedPanel
             title="Material movement"
@@ -1518,22 +1590,30 @@ export function App() {
 
         <section className="dashboard-grid">
           {filteredData.access.stock ? (
-            <ReportingTable
-              title="Material stock"
-              emptyMessage="No stock balances yet."
-              helper="Current stock position calculated from received and issued movement."
-              columns={["Material", "Received", "Issued", "Balance"]}
-              rows={filteredData.stock.map((entry) => [
-                entry.material_name,
-                `${entry.total_received} ${entry.unit_symbol}`,
-                `${entry.total_issued} ${entry.unit_symbol}`,
-                `${entry.current_balance} ${entry.unit_symbol}`,
-              ])}
-            />
+            <PaginatedReportSection
+              sectionLabel="Material stock"
+              offset={reportingPagination.stock}
+              rowCount={filteredData.stock.length}
+              onPrevious={() => handleReportingPageChange("stock", "previous")}
+              onNext={() => handleReportingPageChange("stock", "next")}
+            >
+              <ReportingTable
+                title="Material stock"
+                emptyMessage="No stock balances yet."
+                helper="Current stock position calculated from received and issued movement."
+                columns={["Material", "Received", "Issued", "Balance"]}
+                rows={filteredData.stock.map((entry) => [
+                  entry.material_name,
+                  `${entry.total_received} ${entry.unit_symbol}`,
+                  `${entry.total_issued} ${entry.unit_symbol}`,
+                  `${entry.current_balance} ${entry.unit_symbol}`,
+                ])}
+              />
+            </PaginatedReportSection>
           ) : null}
 
           {filteredData.access.media ? (
-            <div>
+            <div className="paginated-report-section">
               {mediaAccessMessage ? <p className="status-message">{mediaAccessMessage}</p> : null}
               {mediaAccessErrorMessage ? (
                 <p className="error-message">{mediaAccessErrorMessage}</p>
@@ -1543,6 +1623,13 @@ export function App() {
                 emptyMessage="No media files yet."
                 onOpen={handleOpenProjectMedia}
                 onDownload={handleDownloadProjectMedia}
+              />
+              <PaginationControls
+                sectionLabel="Image/proof gallery"
+                offset={reportingPagination.media}
+                rowCount={filteredData.media.length}
+                onPrevious={() => handleReportingPageChange("media", "previous")}
+                onNext={() => handleReportingPageChange("media", "next")}
               />
             </div>
           ) : null}
@@ -1585,6 +1672,74 @@ function AnalyticsPanel({
         </div>
       )}
     </article>
+  );
+}
+
+function PaginatedReportSection({
+  children,
+  sectionLabel,
+  offset,
+  rowCount,
+  onPrevious,
+  onNext,
+}: {
+  children: ReactNode;
+  sectionLabel: string;
+  offset: number;
+  rowCount: number;
+  onPrevious: () => void;
+  onNext: () => void;
+}) {
+  return (
+    <div className="paginated-report-section">
+      {children}
+      <PaginationControls
+        sectionLabel={sectionLabel}
+        offset={offset}
+        rowCount={rowCount}
+        onPrevious={onPrevious}
+        onNext={onNext}
+      />
+    </div>
+  );
+}
+
+function PaginationControls({
+  sectionLabel,
+  offset,
+  rowCount,
+  onPrevious,
+  onNext,
+}: {
+  sectionLabel: string;
+  offset: number;
+  rowCount: number;
+  onPrevious: () => void;
+  onNext: () => void;
+}) {
+  const firstRowNumber = rowCount === 0 ? 0 : offset + 1;
+  const lastRowNumber = offset + rowCount;
+  const canGoPrevious = offset > 0;
+  const canGoNext = rowCount === REPORTING_PAGE_LIMIT;
+  const rangeLabel =
+    rowCount === 0
+      ? `No records on this ${sectionLabel} page`
+      : `Showing ${firstRowNumber}-${lastRowNumber}${
+          rowCount === REPORTING_PAGE_LIMIT ? "+" : ""
+        } for ${sectionLabel}`;
+
+  return (
+    <div className="pagination-controls" aria-label={`${sectionLabel} pagination`}>
+      <span>{rangeLabel}</span>
+      <div>
+        <button type="button" disabled={!canGoPrevious} onClick={onPrevious}>
+          Previous
+        </button>
+        <button type="button" disabled={!canGoNext} onClick={onNext}>
+          Next
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -3243,33 +3398,37 @@ async function loadReportingData(
   accessToken: string,
   fromDate = "",
   toDate = "",
+  pagination: ReportingPagination = emptyReportingPagination,
 ): Promise<ReportingData> {
   const basePath = `/api/companies/${companyId}/projects/${projectId}/reporting`;
-  const reportingQuery = reportingListQuery(fromDate, toDate);
-  const currentStateQuery = reportingListQuery();
+  const progressQuery = reportingListQuery(fromDate, toDate, pagination.progress);
+  const manpowerQuery = reportingListQuery(fromDate, toDate, pagination.manpower);
+  const materialQuery = reportingListQuery(fromDate, toDate, pagination.materials);
+  const stockQuery = reportingListQuery("", "", pagination.stock);
+  const mediaQuery = reportingListQuery(fromDate, toDate, pagination.media);
   const [progress, manpower, materials, stock, media] = await Promise.all([
     optionalApiRequest<ProgressEntry[]>(
-      `${basePath}/progress-entries${reportingQuery}`,
+      `${basePath}/progress-entries${progressQuery}`,
       accessToken,
       [],
     ),
     optionalApiRequest<ManpowerEntry[]>(
-      `${basePath}/manpower-entries${reportingQuery}`,
+      `${basePath}/manpower-entries${manpowerQuery}`,
       accessToken,
       [],
     ),
     optionalApiRequest<MaterialTransaction[]>(
-      `${basePath}/material-transactions${reportingQuery}`,
+      `${basePath}/material-transactions${materialQuery}`,
       accessToken,
       [],
     ),
     optionalApiRequest<MaterialStockBalance[]>(
-      `${basePath}/material-stock-balances${currentStateQuery}`,
+      `${basePath}/material-stock-balances${stockQuery}`,
       accessToken,
       [],
     ),
     optionalApiRequest<MediaFile[]>(
-      `${basePath}/media-files${reportingQuery}`,
+      `${basePath}/media-files${mediaQuery}`,
       accessToken,
       [],
     ),

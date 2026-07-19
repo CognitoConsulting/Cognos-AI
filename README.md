@@ -93,7 +93,8 @@ Current foundation includes:
 - polished reporting workspace with health indicators, row counts, clearer empty states, and role-aware restricted messages
 - backend date-range filters for project reporting APIs used by the dashboard
 - backend pagination limits for project reporting APIs, with dashboard requests capped for MVP stability
-- dashboard notice explaining the current latest-record reporting cap before full pagination UI
+- dashboard notice explaining the current reporting page size
+- dashboard Previous/Next controls for paging through reporting sections
 
 ## Planned architecture
 

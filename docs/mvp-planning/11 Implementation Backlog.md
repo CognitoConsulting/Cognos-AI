@@ -719,8 +719,9 @@ Acceptance criteria:
 - reporting APIs support `from_date` and `to_date` for progress, manpower, material transaction, and media/proof lists
 - dashboard sends the selected date range to reporting APIs instead of only filtering after loading all rows
 - reporting APIs support `limit` and `offset` so large projects can be loaded in bounded pages
-- dashboard reporting requests are capped to the MVP page size until full page navigation is added
-- dashboard tells users that reporting views and exports currently show the latest MVP-capped records
+- dashboard reporting requests use the MVP page size for each paged reporting section
+- dashboard tells users that reporting views and exports currently use the visible paged records
+- dashboard users can move through reporting pages with Previous/Next controls per reporting section
 - filters support user, activity, and material where relevant
 
 Dependencies:
