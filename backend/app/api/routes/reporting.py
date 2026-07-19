@@ -3,7 +3,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import Response
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -41,6 +41,7 @@ from app.schemas.reporting import (
     MediaFileRead,
     ProgressEntryCreate,
     ProgressEntryRead,
+    ReportingCountRead,
 )
 from app.services.media_storage import resolve_media_access
 
@@ -107,6 +108,27 @@ def list_progress_entries(
     )
 
 
+@router.get("/progress-entries/count", response_model=ReportingCountRead)
+def count_progress_entries(
+    company_id: UUID,
+    project_id: UUID,
+    from_date: date | None = None,
+    to_date: date | None = None,
+    auth: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_database_session),
+) -> ReportingCountRead:
+    require_project_entry_access(db, company_id, project_id, auth, "progress")
+    _validate_date_range(from_date, to_date)
+    query = (
+        select(func.count())
+        .select_from(ProgressEntry)
+        .where(ProgressEntry.company_id == company_id)
+        .where(ProgressEntry.project_id == project_id)
+    )
+    query = _apply_date_range(query, ProgressEntry.work_date, from_date, to_date)
+    return ReportingCountRead(total=db.scalar(query) or 0)
+
+
 @router.post(
     "/manpower-entries",
     response_model=ManpowerEntryRead,
@@ -159,6 +181,27 @@ def list_manpower_entries(
             )
         ).all()
     )
+
+
+@router.get("/manpower-entries/count", response_model=ReportingCountRead)
+def count_manpower_entries(
+    company_id: UUID,
+    project_id: UUID,
+    from_date: date | None = None,
+    to_date: date | None = None,
+    auth: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_database_session),
+) -> ReportingCountRead:
+    require_project_entry_access(db, company_id, project_id, auth, "manpower")
+    _validate_date_range(from_date, to_date)
+    query = (
+        select(func.count())
+        .select_from(ManpowerEntry)
+        .where(ManpowerEntry.company_id == company_id)
+        .where(ManpowerEntry.project_id == project_id)
+    )
+    query = _apply_date_range(query, ManpowerEntry.work_date, from_date, to_date)
+    return ReportingCountRead(total=db.scalar(query) or 0)
 
 
 @router.post(
@@ -230,6 +273,32 @@ def list_material_transactions(
     )
 
 
+@router.get("/material-transactions/count", response_model=ReportingCountRead)
+def count_material_transactions(
+    company_id: UUID,
+    project_id: UUID,
+    from_date: date | None = None,
+    to_date: date | None = None,
+    auth: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_database_session),
+) -> ReportingCountRead:
+    require_project_entry_access(db, company_id, project_id, auth, "materials")
+    _validate_date_range(from_date, to_date)
+    query = (
+        select(func.count())
+        .select_from(MaterialTransaction)
+        .where(MaterialTransaction.company_id == company_id)
+        .where(MaterialTransaction.project_id == project_id)
+    )
+    query = _apply_date_range(
+        query,
+        MaterialTransaction.transaction_date,
+        from_date,
+        to_date,
+    )
+    return ReportingCountRead(total=db.scalar(query) or 0)
+
+
 @router.post(
     "/material-stock-balances",
     response_model=MaterialStockBalanceRead,
@@ -287,6 +356,29 @@ def list_material_stock_balances(
     )
 
 
+@router.get("/material-stock-balances/count", response_model=ReportingCountRead)
+def count_material_stock_balances(
+    company_id: UUID,
+    project_id: UUID,
+    auth: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_database_session),
+) -> ReportingCountRead:
+    require_project_entry_access(
+        db,
+        company_id,
+        project_id,
+        auth,
+        "materials",
+    )
+    query = (
+        select(func.count())
+        .select_from(MaterialStockBalance)
+        .where(MaterialStockBalance.company_id == company_id)
+        .where(MaterialStockBalance.project_id == project_id)
+    )
+    return ReportingCountRead(total=db.scalar(query) or 0)
+
+
 @router.post("/media-files", response_model=MediaFileRead, status_code=status.HTTP_201_CREATED)
 def create_media_file(
     company_id: UUID,
@@ -329,6 +421,27 @@ def list_media_files(
             _apply_pagination(query.order_by(MediaFile.created_at.desc()), limit, offset)
         ).all()
     )
+
+
+@router.get("/media-files/count", response_model=ReportingCountRead)
+def count_media_files(
+    company_id: UUID,
+    project_id: UUID,
+    from_date: date | None = None,
+    to_date: date | None = None,
+    auth: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_database_session),
+) -> ReportingCountRead:
+    require_project_dashboard_access(db, company_id, project_id, auth)
+    _validate_date_range(from_date, to_date)
+    query = (
+        select(func.count())
+        .select_from(MediaFile)
+        .where(MediaFile.company_id == company_id)
+        .where(MediaFile.project_id == project_id)
+    )
+    query = _apply_datetime_date_range(query, MediaFile.created_at, from_date, to_date)
+    return ReportingCountRead(total=db.scalar(query) or 0)
 
 
 @router.get("/media-files/{media_file_id}/access")

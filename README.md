@@ -95,6 +95,7 @@ Current foundation includes:
 - backend pagination limits for project reporting APIs, with dashboard requests capped for MVP stability
 - dashboard notice explaining the current reporting page size
 - dashboard Previous/Next controls for paging through reporting sections
+- reporting total-count endpoints and exact dashboard pagination totals
 
 ## Planned architecture
 

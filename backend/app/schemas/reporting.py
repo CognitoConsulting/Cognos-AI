@@ -7,6 +7,10 @@ from pydantic import BaseModel, Field
 from app.schemas.common import ORMBaseModel
 
 
+class ReportingCountRead(BaseModel):
+    total: int
+
+
 class ProgressEntryCreate(BaseModel):
     entered_by: UUID | None = None
     source_whatsapp_message_id: UUID | None = None

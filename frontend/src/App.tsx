@@ -269,6 +269,7 @@ type ReportingData = {
   stock: MaterialStockBalance[];
   media: MediaFile[];
   access: ReportingAccess;
+  totals: ReportingTotals;
 };
 
 type ReportingAccess = {
@@ -282,6 +283,12 @@ type ReportingAccess = {
 type ReportingSectionId = "progress" | "manpower" | "materials" | "stock" | "media";
 
 type ReportingPagination = Record<ReportingSectionId, number>;
+
+type ReportingTotals = Record<ReportingSectionId, number>;
+
+type ReportingCount = {
+  total: number;
+};
 
 type AnalyticsRow = {
   label: string;
@@ -352,6 +359,13 @@ const emptyReportingData: ReportingData = {
   stock: [],
   media: [],
   access: noReportingAccess,
+  totals: {
+    progress: 0,
+    manpower: 0,
+    materials: 0,
+    stock: 0,
+    media: 0,
+  },
 };
 
 const emptyReportingPagination: ReportingPagination = {
@@ -1505,6 +1519,7 @@ export function App() {
             sectionLabel="Progress"
             offset={reportingPagination.progress}
             rowCount={filteredData.progress.length}
+            totalCount={filteredData.totals.progress}
             onPrevious={() => handleReportingPageChange("progress", "previous")}
             onNext={() => handleReportingPageChange("progress", "next")}
           >
@@ -1534,6 +1549,7 @@ export function App() {
             sectionLabel="Manpower"
             offset={reportingPagination.manpower}
             rowCount={filteredData.manpower.length}
+            totalCount={filteredData.totals.manpower}
             onPrevious={() => handleReportingPageChange("manpower", "previous")}
             onNext={() => handleReportingPageChange("manpower", "next")}
           >
@@ -1563,6 +1579,7 @@ export function App() {
             sectionLabel="Material movement"
             offset={reportingPagination.materials}
             rowCount={filteredData.materials.length}
+            totalCount={filteredData.totals.materials}
             onPrevious={() => handleReportingPageChange("materials", "previous")}
             onNext={() => handleReportingPageChange("materials", "next")}
           >
@@ -1594,6 +1611,7 @@ export function App() {
               sectionLabel="Material stock"
               offset={reportingPagination.stock}
               rowCount={filteredData.stock.length}
+              totalCount={filteredData.totals.stock}
               onPrevious={() => handleReportingPageChange("stock", "previous")}
               onNext={() => handleReportingPageChange("stock", "next")}
             >
@@ -1628,6 +1646,7 @@ export function App() {
                 sectionLabel="Image/proof gallery"
                 offset={reportingPagination.media}
                 rowCount={filteredData.media.length}
+                totalCount={filteredData.totals.media}
                 onPrevious={() => handleReportingPageChange("media", "previous")}
                 onNext={() => handleReportingPageChange("media", "next")}
               />
@@ -1680,6 +1699,7 @@ function PaginatedReportSection({
   sectionLabel,
   offset,
   rowCount,
+  totalCount,
   onPrevious,
   onNext,
 }: {
@@ -1687,6 +1707,7 @@ function PaginatedReportSection({
   sectionLabel: string;
   offset: number;
   rowCount: number;
+  totalCount: number;
   onPrevious: () => void;
   onNext: () => void;
 }) {
@@ -1697,6 +1718,7 @@ function PaginatedReportSection({
         sectionLabel={sectionLabel}
         offset={offset}
         rowCount={rowCount}
+        totalCount={totalCount}
         onPrevious={onPrevious}
         onNext={onNext}
       />
@@ -1708,25 +1730,25 @@ function PaginationControls({
   sectionLabel,
   offset,
   rowCount,
+  totalCount,
   onPrevious,
   onNext,
 }: {
   sectionLabel: string;
   offset: number;
   rowCount: number;
+  totalCount: number;
   onPrevious: () => void;
   onNext: () => void;
 }) {
   const firstRowNumber = rowCount === 0 ? 0 : offset + 1;
   const lastRowNumber = offset + rowCount;
   const canGoPrevious = offset > 0;
-  const canGoNext = rowCount === REPORTING_PAGE_LIMIT;
+  const canGoNext = lastRowNumber < totalCount;
   const rangeLabel =
     rowCount === 0
       ? `No records on this ${sectionLabel} page`
-      : `Showing ${firstRowNumber}-${lastRowNumber}${
-          rowCount === REPORTING_PAGE_LIMIT ? "+" : ""
-        } for ${sectionLabel}`;
+      : `Showing ${firstRowNumber}-${lastRowNumber} of ${totalCount} for ${sectionLabel}`;
 
   return (
     <div className="pagination-controls" aria-label={`${sectionLabel} pagination`}>
@@ -3406,7 +3428,19 @@ async function loadReportingData(
   const materialQuery = reportingListQuery(fromDate, toDate, pagination.materials);
   const stockQuery = reportingListQuery("", "", pagination.stock);
   const mediaQuery = reportingListQuery(fromDate, toDate, pagination.media);
-  const [progress, manpower, materials, stock, media] = await Promise.all([
+  const dateRangeCountQuery = reportingCountQuery(fromDate, toDate);
+  const [
+    progress,
+    manpower,
+    materials,
+    stock,
+    media,
+    progressCount,
+    manpowerCount,
+    materialCount,
+    stockCount,
+    mediaCount,
+  ] = await Promise.all([
     optionalApiRequest<ProgressEntry[]>(
       `${basePath}/progress-entries${progressQuery}`,
       accessToken,
@@ -3432,6 +3466,31 @@ async function loadReportingData(
       accessToken,
       [],
     ),
+    optionalApiRequest<ReportingCount>(
+      `${basePath}/progress-entries/count${dateRangeCountQuery}`,
+      accessToken,
+      { total: 0 },
+    ),
+    optionalApiRequest<ReportingCount>(
+      `${basePath}/manpower-entries/count${dateRangeCountQuery}`,
+      accessToken,
+      { total: 0 },
+    ),
+    optionalApiRequest<ReportingCount>(
+      `${basePath}/material-transactions/count${dateRangeCountQuery}`,
+      accessToken,
+      { total: 0 },
+    ),
+    optionalApiRequest<ReportingCount>(
+      `${basePath}/material-stock-balances/count`,
+      accessToken,
+      { total: 0 },
+    ),
+    optionalApiRequest<ReportingCount>(
+      `${basePath}/media-files/count${dateRangeCountQuery}`,
+      accessToken,
+      { total: 0 },
+    ),
   ]);
 
   return {
@@ -3447,6 +3506,13 @@ async function loadReportingData(
       stock: stock.available,
       media: media.available,
     },
+    totals: {
+      progress: progressCount.data.total,
+      manpower: manpowerCount.data.total,
+      materials: materialCount.data.total,
+      stock: stockCount.data.total,
+      media: mediaCount.data.total,
+    },
   };
 }
 
@@ -3461,6 +3527,18 @@ function reportingListQuery(fromDate = "", toDate = "", offset = 0): string {
   params.set("limit", String(REPORTING_PAGE_LIMIT));
   if (offset > 0) {
     params.set("offset", String(offset));
+  }
+  const query = params.toString();
+  return query ? `?${query}` : "";
+}
+
+function reportingCountQuery(fromDate = "", toDate = ""): string {
+  const params = new URLSearchParams();
+  if (fromDate) {
+    params.set("from_date", fromDate);
+  }
+  if (toDate) {
+    params.set("to_date", toDate);
   }
   const query = params.toString();
   return query ? `?${query}` : "";
@@ -3535,6 +3613,7 @@ function filterReportingData(data: ReportingData, fromDate: string, toDate: stri
     stock: data.stock,
     media: data.media.filter((entry) => isDateInRange(entry.created_at.slice(0, 10), fromDate, toDate)),
     access: data.access,
+    totals: data.totals,
   };
 }
 
