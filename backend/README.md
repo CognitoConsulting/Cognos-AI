@@ -214,6 +214,8 @@ Current parser behavior:
 - detects material issued
 - detects irrelevant/offensive messages
 - extracts basic quantity, unit, material, activity, trade counts, and location where possible
+- recognizes common construction terms such as slab casting, RCC, shuttering, bar bending, blockwork, TMT, rebar, and saria
+- formats assistant prompts in cleaner site language instead of technical field dumps
 - marks missing information for follow-up
 
 This is a rule-based foundation. External AI model calls will be added later.

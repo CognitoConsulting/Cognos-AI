@@ -55,6 +55,7 @@ Current foundation includes:
 - project knowledgebase Excel template download and import foundation
 - provider-neutral WhatsApp webhook intake and message audit storage
 - first rule-based assistant parser foundation
+- first construction-aware assistant response foundation with cleaner confirmation and missing-detail prompts
 - assistant confirmation/missing-information conversation state foundation
 - provider-neutral outbound WhatsApp reply logging with generic/test simulated delivery
 - daily WhatsApp summary foundation with configurable 7 PM local default, preview, manual send, and send audit records

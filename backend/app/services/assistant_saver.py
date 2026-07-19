@@ -65,6 +65,7 @@ CORRECTION_FIELD_TERMS = {
     "labour",
     "labor",
     "mazdoor",
+    "mistri",
     "electrician",
     "plumber",
     "carpenter",
@@ -87,6 +88,9 @@ UNIT_TERMS = {
 MATERIAL_TERMS = {
     "cement",
     "steel",
+    "tmt",
+    "rebar",
+    "saria",
     "brick",
     "bricks",
     "sand",
@@ -96,14 +100,27 @@ MATERIAL_TERMS = {
 }
 
 ACTIVITY_TERMS = {
+    "bar bending",
+    "blockwork",
+    "block work",
     "plastering",
     "plaster",
     "brickwork",
+    "brick work",
     "waterproofing",
+    "water proofing",
     "painting",
     "tiling",
     "excavation",
     "concreting",
+    "rcc",
+    "rcc work",
+    "shuttering",
+    "formwork",
+    "form work",
+    "slab casting",
+    "slab",
+    "steel fixing",
 }
 
 TRADE_TERMS = {
@@ -112,6 +129,7 @@ TRADE_TERMS = {
     "labour",
     "labor",
     "mazdoor",
+    "mistri",
     "electrician",
     "plumber",
     "carpenter",
@@ -334,8 +352,9 @@ def _save_pending_state_to_project(
     if not _user_can_save_intent(db, user, project, pending_state.pending_intent):
         pending_state.status = "permission_denied"
         pending_state.confirmation_prompt = (
-            "I understood your confirmation, but your current project role does not allow "
-            "you to save this type of update. Please ask your project manager or company admin."
+            "I understood the update, but your current project role does not allow you to save "
+            "this type of entry. Please ask your project manager or company admin to update "
+            "your access."
         )
         db.commit()
         return ConfirmationSaveResult(
@@ -348,7 +367,7 @@ def _save_pending_state_to_project(
     record_count = _save_state_to_reporting_records(db, pending_state, project)
     pending_state.status = "saved"
     pending_state.missing_fields = []
-    pending_state.confirmation_prompt = "Saved. I have recorded this update."
+    pending_state.confirmation_prompt = "Saved. I have recorded this site update."
     pending_state.updated_at = datetime.utcnow()
     db.commit()
 
@@ -589,6 +608,19 @@ def _extract_trade_counts(lowered: str) -> dict[str, int]:
 
 
 def _extract_material_term(lowered: str) -> str | None:
+    material_aliases = {
+        "aggregate": {"aggregate", "aggregates"},
+        "brick": {"brick", "bricks"},
+        "cement": {"cement"},
+        "paint": {"paint"},
+        "sand": {"sand"},
+        "steel": {"steel", "tmt", "rebar", "saria", "steel bar", "steel bars", "rod", "rods"},
+        "tiles": {"tiles", "tile"},
+    }
+    for material, aliases in material_aliases.items():
+        for alias in sorted(aliases, key=len, reverse=True):
+            if re.search(rf"\b{re.escape(alias)}\b", lowered):
+                return material
     for material in sorted(MATERIAL_TERMS, key=len, reverse=True):
         if re.search(rf"\b{re.escape(material)}\b", lowered):
             return material
@@ -596,25 +628,40 @@ def _extract_material_term(lowered: str) -> str | None:
 
 
 def _extract_activity_term(lowered: str) -> str | None:
-    for activity in sorted(ACTIVITY_TERMS, key=len, reverse=True):
-        if re.search(rf"\b{re.escape(activity)}\b", lowered):
-            return "plastering" if activity == "plaster" else activity
+    activity_aliases = {
+        "bar bending": {"bar bending", "barbending"},
+        "blockwork": {"blockwork", "block work", "block masonry"},
+        "brickwork": {"brickwork", "brick work", "brick masonry"},
+        "concreting": {"concreting", "concrete", "rcc", "rcc work"},
+        "excavation": {"excavation", "excavating"},
+        "painting": {"painting", "paint work"},
+        "plastering": {"plastering", "plaster"},
+        "shuttering": {"shuttering", "formwork", "form work"},
+        "slab casting": {"slab casting", "slab cast", "slab concreting", "slab"},
+        "steel fixing": {"steel fixing", "rebar fixing", "tmt fixing"},
+        "tiling": {"tiling", "tile work"},
+        "waterproofing": {"waterproofing", "water proofing"},
+    }
+    for activity, aliases in activity_aliases.items():
+        for alias in sorted(aliases, key=len, reverse=True):
+            if re.search(rf"\b{re.escape(alias)}\b", lowered):
+                return activity
     return None
 
 
 def _build_corrected_confirmation_prompt(intent: str, pending_data: dict) -> str:
     return (
-        f"I have updated the {intent.replace('_', ' ')} entry:\n"
+        f"Updated. Here is the corrected {_readable_intent(intent)} entry:\n"
         f"{_summarize_pending_data(pending_data)}\n\n"
-        "Please reply Yes to save this corrected entry, or tell me what else to change."
+        "Reply Yes to save it, or send another correction."
     )
 
 
 def _build_completed_missing_information_prompt(intent: str, pending_data: dict) -> str:
     return (
-        f"Thanks, I have completed the {intent.replace('_', ' ')} entry:\n"
+        f"Thanks. I now have the details for this {_readable_intent(intent)} entry:\n"
         f"{_summarize_pending_data(pending_data)}\n\n"
-        "Please reply Yes to save this entry, or tell me what to change."
+        "Reply Yes to save it, or tell me what to change."
     )
 
 
@@ -628,25 +675,62 @@ def _build_missing_information_followup_prompt(
     if understood:
         return (
             f"Got it. I still need {readable_missing} for this "
-            f"{intent.replace('_', ' ')} entry. Please send that detail."
+            f"{_readable_intent(intent)} entry. Please send just that detail."
         )
     return (
-        f"I still need {readable_missing} for this {intent.replace('_', ' ')} entry. "
+        f"I still need {readable_missing} for this {_readable_intent(intent)} entry. "
         "Please send the missing detail in a simple reply."
     )
 
 
 def _summarize_pending_data(pending_data: dict) -> str:
-    details = []
-    for key, value in pending_data.items():
-        if key == "original_text" or value in [None, {}, []]:
-            continue
-        if isinstance(value, dict):
-            nested = ", ".join(f"{nested_key}: {nested_value}" for nested_key, nested_value in value.items())
-            details.append(f"{key.replace('_', ' ')}: {nested}")
-        else:
-            details.append(f"{key.replace('_', ' ')}: {value}")
-    return "; ".join(details) if details else "No structured details found yet."
+    if "trade_counts" in pending_data:
+        trade_counts = pending_data.get("trade_counts") or {}
+        location = pending_data.get("location")
+        location_text = f" at {location}" if location else ""
+        return f"Manpower: {_format_trade_counts(trade_counts)}{location_text}."
+
+    if "material" in pending_data:
+        material = pending_data.get("material")
+        quantity = _format_quantity(pending_data.get("quantity"))
+        unit = pending_data.get("unit")
+        location = pending_data.get("location")
+        location_text = f" at {location}" if location else ""
+        return f"Material: {quantity} {unit} of {material}{location_text}."
+
+    if "activity" in pending_data:
+        activity = pending_data.get("activity")
+        quantity = _format_quantity(pending_data.get("quantity"))
+        unit = pending_data.get("unit")
+        location = pending_data.get("location")
+        return f"Progress: {activity}, {quantity} {unit} at {location}."
+
+    return "I found the structured details, but they need review before saving."
+
+
+def _readable_intent(intent: str) -> str:
+    labels = {
+        "material_issued": "material issued",
+        "material_received": "material received",
+        "manpower": "manpower",
+        "progress": "progress",
+    }
+    return labels.get(intent, intent.replace("_", " "))
+
+
+def _format_trade_counts(trade_counts: dict) -> str:
+    return ", ".join(
+        f"{worker_count} {trade_name}"
+        for trade_name, worker_count in sorted(trade_counts.items())
+    )
+
+
+def _format_quantity(value: object) -> str:
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    if isinstance(value, Decimal) and value == value.to_integral_value():
+        return str(int(value))
+    return str(value)
 
 
 def _resolve_single_project_for_user(db: Session, user: User) -> Project | None:

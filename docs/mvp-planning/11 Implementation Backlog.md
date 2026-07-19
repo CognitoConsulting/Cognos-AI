@@ -459,6 +459,7 @@ Acceptance criteria:
 - parser detects material issued intent
 - parser detects image/proof relationship
 - parser extracts project, location, activity/material/trade, quantity, unit, and date where available
+- parser recognizes common construction terms such as RCC, slab casting, shuttering, bar bending, blockwork, TMT, rebar, and saria
 - parser asks only for missing information
 - first parser output is stored separately from raw WhatsApp messages for audit and review
 
@@ -479,6 +480,8 @@ Acceptance criteria:
 
 - assistant avoids command-first language
 - assistant supports English, Hindi, and Hinglish common cases
+- assistant summarizes entries in site-language instead of technical field names
+- assistant gives cleaner confirmation, correction, saved, and missing-detail prompts
 - assistant responds professionally to obscene, offensive, or irrelevant messages
 - assistant redirects user back to project reporting
 - assistant does not make offensive comments

@@ -31,6 +31,8 @@ PROGRESS_TERMS = {
     "done",
     "hua",
     "kiya",
+    "cast",
+    "casting",
     "finish",
     "finished",
 }
@@ -41,6 +43,7 @@ MANPOWER_TERMS = {
     "labour",
     "labor",
     "mazdoor",
+    "mistri",
     "electrician",
     "plumber",
     "carpenter",
@@ -66,12 +69,50 @@ MATERIAL_ISSUED_TERMS = {
 MATERIAL_TERMS = {
     "cement",
     "steel",
+    "tmt",
+    "rebar",
+    "saria",
     "brick",
     "bricks",
     "sand",
     "aggregate",
     "tiles",
     "paint",
+}
+
+ACTIVITY_ALIASES = {
+    "bar bending": {"bar bending", "barbending"},
+    "blockwork": {"blockwork", "block work", "block masonry"},
+    "brickwork": {"brickwork", "brick work", "brick masonry"},
+    "concreting": {"concreting", "concrete", "rcc", "rcc work"},
+    "excavation": {"excavation", "excavating"},
+    "painting": {"painting", "paint work"},
+    "plastering": {"plastering", "plaster"},
+    "shuttering": {"shuttering", "formwork", "form work"},
+    "slab casting": {"slab casting", "slab cast", "slab concreting", "slab"},
+    "steel fixing": {"steel fixing", "rebar fixing", "tmt fixing"},
+    "tiling": {"tiling", "tile work"},
+    "waterproofing": {"waterproofing", "water proofing"},
+}
+
+MATERIAL_ALIASES = {
+    "aggregate": {"aggregate", "aggregates"},
+    "brick": {"brick", "bricks"},
+    "cement": {"cement"},
+    "paint": {"paint"},
+    "sand": {"sand"},
+    "steel": {"steel", "tmt", "rebar", "saria", "steel bar", "steel bars", "rod", "rods"},
+    "tiles": {"tiles", "tile"},
+}
+
+TRADE_ALIASES = {
+    "carpenter": {"carpenter"},
+    "electrician": {"electrician"},
+    "helper": {"helper", "helpers", "belder", "beldar"},
+    "labour": {"labour", "labor", "mazdoor", "labours", "labors"},
+    "mason": {"mason", "masons", "mistri", "mistris"},
+    "painter": {"painter"},
+    "plumber": {"plumber"},
 }
 
 UNIT_TERMS = {
@@ -99,7 +140,9 @@ def parse_message(message_text: str | None) -> ParsedAssistantMessage:
             input_language=None,
             missing_fields=["message_text"],
             validation_status="missing_information",
-            assistant_summary="I could not find any message content to process.",
+            assistant_summary=(
+                "I did not receive any message text. Please send the site update again."
+            ),
             next_action="ask_missing_information",
         )
 
@@ -113,8 +156,8 @@ def parse_message(message_text: str | None) -> ParsedAssistantMessage:
             extracted_data={"original_text": text},
             validation_status="rejected",
             assistant_summary=(
-                "I can help with project updates such as progress, manpower, "
-                "materials, and site images. Please share the site update you want to record."
+                "I can help record site progress, manpower, material movement, and proofs. "
+                "Please send the project update in simple work-related language."
             ),
             next_action="redirect_professionally",
         )
@@ -139,8 +182,8 @@ def parse_message(message_text: str | None) -> ParsedAssistantMessage:
         missing_fields=["intent"],
         validation_status="missing_information",
         assistant_summary=(
-            "I can help record progress, manpower, material received, material issued, "
-            "or site images. What would you like to update?"
+            "I can record progress, manpower, material received, material issued, or site "
+            "proofs. Please tell me what you want to update."
         ),
         next_action="ask_missing_information",
     )
@@ -257,11 +300,24 @@ def _looks_like_material_issued(lowered: str) -> bool:
 
 
 def _contains_any(text: str, terms: set[str]) -> bool:
-    return any(term in text for term in terms)
+    return any(re.search(rf"\b{re.escape(term)}\b", text) for term in terms)
 
 
 def _detect_language(lowered: str) -> str:
-    hinglish_terms = {"aaj", "hua", "kaam", "mazdoor", "aaye", "diya", "liye"}
+    hinglish_terms = {
+        "aaj",
+        "aaya",
+        "aaye",
+        "diya",
+        "hua",
+        "kaam",
+        "ke",
+        "liye",
+        "mazdoor",
+        "mein",
+        "me",
+        "par",
+    }
     if _contains_any(lowered, hinglish_terms):
         return "hinglish"
     return "english"
@@ -298,35 +354,93 @@ def _extract_location(text: str) -> str | None:
 
 def _extract_activity(text: str) -> str | None:
     lowered = text.lower()
-    known_activities = ["plastering", "plaster", "brickwork", "waterproofing", "painting", "tiling", "excavation", "concreting"]
-    for activity in known_activities:
-        if activity in lowered:
-            return "plastering" if activity == "plaster" else activity
+    for canonical, aliases in ACTIVITY_ALIASES.items():
+        for alias in sorted(aliases, key=len, reverse=True):
+            if re.search(rf"\b{re.escape(alias)}\b", lowered):
+                return canonical
     return None
 
 
 def _extract_material(lowered: str) -> str | None:
-    for material in MATERIAL_TERMS:
-        if material in lowered:
-            return material
+    for canonical, aliases in MATERIAL_ALIASES.items():
+        for alias in sorted(aliases, key=len, reverse=True):
+            if re.search(rf"\b{re.escape(alias)}\b", lowered):
+                return canonical
     return None
 
 
 def _extract_trades(lowered: str) -> dict[str, int]:
     trades: dict[str, int] = {}
-    for trade in MANPOWER_TERMS:
-        match = re.search(rf"\b(\d+)\s+{re.escape(trade)}s?\b", lowered)
-        if match:
-            trades[trade] = int(match.group(1))
+    for canonical, aliases in TRADE_ALIASES.items():
+        for alias in sorted(aliases, key=len, reverse=True):
+            count = _extract_trade_count(lowered, alias)
+            if count is not None:
+                trades[canonical] = count
+                break
     return trades
 
 
 def _build_summary(title: str, extracted: dict, missing: list[str]) -> str:
     if missing:
-        return f"{title} update detected, but missing: {', '.join(missing)}."
-    details = []
-    for key, value in extracted.items():
-        if key == "original_text" or value in [None, {}, []]:
-            continue
-        details.append(f"{key}: {value}")
-    return f"{title} update detected. " + "; ".join(details)
+        missing_text = ", ".join(_humanize_field(field) for field in missing)
+        return f"I understood this as {title.lower()}, but I still need {missing_text}."
+
+    if title == "Progress":
+        activity = extracted.get("activity")
+        quantity = _format_quantity(extracted.get("quantity"))
+        unit = extracted.get("unit")
+        location = extracted.get("location")
+        return f"I read this as progress: {activity}, {quantity} {unit} at {location}."
+
+    if title == "Manpower":
+        trade_counts = _format_trade_counts(extracted.get("trade_counts") or {})
+        location = extracted.get("location")
+        return f"I read this as manpower: {trade_counts} at {location}."
+
+    if title in {"Material received", "Material issued"}:
+        material = extracted.get("material")
+        quantity = _format_quantity(extracted.get("quantity"))
+        unit = extracted.get("unit")
+        location = extracted.get("location")
+        location_text = f" at {location}" if location else ""
+        return f"I read this as {title.lower()}: {quantity} {unit} of {material}{location_text}."
+
+    return f"I understood this as {title.lower()}."
+
+
+def _extract_trade_count(lowered: str, trade: str) -> int | None:
+    before_trade = re.search(rf"\b(\d+)\s+{re.escape(trade)}s?\b", lowered)
+    if before_trade:
+        return int(before_trade.group(1))
+
+    after_trade = re.search(rf"\b{re.escape(trade)}s?\s*(?:is|are|=|:)?\s*(\d+)\b", lowered)
+    if after_trade:
+        return int(after_trade.group(1))
+
+    return None
+
+
+def _format_trade_counts(trade_counts: dict[str, int]) -> str:
+    return ", ".join(
+        f"{count} {trade}" for trade, count in sorted(trade_counts.items())
+    )
+
+
+def _format_quantity(value: object) -> str:
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    return str(value)
+
+
+def _humanize_field(field: str) -> str:
+    labels = {
+        "activity": "the activity or work item",
+        "intent": "the type of update",
+        "location": "the location or area",
+        "material": "the material name",
+        "message_text": "the message text",
+        "quantity": "the quantity",
+        "trade_counts": "the worker count by trade",
+        "unit": "the unit",
+    }
+    return labels.get(field, field.replace("_", " "))
