@@ -78,6 +78,8 @@ def list_progress_entries(
     project_id: UUID,
     from_date: date | None = None,
     to_date: date | None = None,
+    entered_by: UUID | None = None,
+    activity_name: str | None = None,
     limit: int = Query(DEFAULT_REPORTING_PAGE_LIMIT, ge=1, le=MAX_REPORTING_PAGE_LIMIT),
     offset: int = Query(0, ge=0),
     auth: AuthContext = Depends(get_auth_context),
@@ -97,6 +99,8 @@ def list_progress_entries(
         .where(ProgressEntry.project_id == project_id)
     )
     query = _apply_date_range(query, ProgressEntry.work_date, from_date, to_date)
+    query = _apply_uuid_filter(query, ProgressEntry.entered_by, entered_by)
+    query = _apply_text_filter(query, ProgressEntry.activity_name, activity_name)
     return list(
         db.scalars(
             _apply_pagination(
@@ -114,6 +118,8 @@ def count_progress_entries(
     project_id: UUID,
     from_date: date | None = None,
     to_date: date | None = None,
+    entered_by: UUID | None = None,
+    activity_name: str | None = None,
     auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_database_session),
 ) -> ReportingCountRead:
@@ -126,6 +132,8 @@ def count_progress_entries(
         .where(ProgressEntry.project_id == project_id)
     )
     query = _apply_date_range(query, ProgressEntry.work_date, from_date, to_date)
+    query = _apply_uuid_filter(query, ProgressEntry.entered_by, entered_by)
+    query = _apply_text_filter(query, ProgressEntry.activity_name, activity_name)
     return ReportingCountRead(total=db.scalar(query) or 0)
 
 
@@ -153,6 +161,8 @@ def list_manpower_entries(
     project_id: UUID,
     from_date: date | None = None,
     to_date: date | None = None,
+    entered_by: UUID | None = None,
+    trade_name: str | None = None,
     limit: int = Query(DEFAULT_REPORTING_PAGE_LIMIT, ge=1, le=MAX_REPORTING_PAGE_LIMIT),
     offset: int = Query(0, ge=0),
     auth: AuthContext = Depends(get_auth_context),
@@ -172,6 +182,8 @@ def list_manpower_entries(
         .where(ManpowerEntry.project_id == project_id)
     )
     query = _apply_date_range(query, ManpowerEntry.work_date, from_date, to_date)
+    query = _apply_uuid_filter(query, ManpowerEntry.entered_by, entered_by)
+    query = _apply_text_filter(query, ManpowerEntry.trade_name, trade_name)
     return list(
         db.scalars(
             _apply_pagination(
@@ -189,6 +201,8 @@ def count_manpower_entries(
     project_id: UUID,
     from_date: date | None = None,
     to_date: date | None = None,
+    entered_by: UUID | None = None,
+    trade_name: str | None = None,
     auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_database_session),
 ) -> ReportingCountRead:
@@ -201,6 +215,8 @@ def count_manpower_entries(
         .where(ManpowerEntry.project_id == project_id)
     )
     query = _apply_date_range(query, ManpowerEntry.work_date, from_date, to_date)
+    query = _apply_uuid_filter(query, ManpowerEntry.entered_by, entered_by)
+    query = _apply_text_filter(query, ManpowerEntry.trade_name, trade_name)
     return ReportingCountRead(total=db.scalar(query) or 0)
 
 
@@ -235,6 +251,8 @@ def list_material_transactions(
     project_id: UUID,
     from_date: date | None = None,
     to_date: date | None = None,
+    entered_by: UUID | None = None,
+    material_name: str | None = None,
     limit: int = Query(DEFAULT_REPORTING_PAGE_LIMIT, ge=1, le=MAX_REPORTING_PAGE_LIMIT),
     offset: int = Query(0, ge=0),
     auth: AuthContext = Depends(get_auth_context),
@@ -259,6 +277,8 @@ def list_material_transactions(
         from_date,
         to_date,
     )
+    query = _apply_uuid_filter(query, MaterialTransaction.entered_by, entered_by)
+    query = _apply_text_filter(query, MaterialTransaction.material_name, material_name)
     return list(
         db.scalars(
             _apply_pagination(
@@ -279,6 +299,8 @@ def count_material_transactions(
     project_id: UUID,
     from_date: date | None = None,
     to_date: date | None = None,
+    entered_by: UUID | None = None,
+    material_name: str | None = None,
     auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_database_session),
 ) -> ReportingCountRead:
@@ -296,6 +318,8 @@ def count_material_transactions(
         from_date,
         to_date,
     )
+    query = _apply_uuid_filter(query, MaterialTransaction.entered_by, entered_by)
+    query = _apply_text_filter(query, MaterialTransaction.material_name, material_name)
     return ReportingCountRead(total=db.scalar(query) or 0)
 
 
@@ -330,6 +354,7 @@ def create_material_stock_balance(
 def list_material_stock_balances(
     company_id: UUID,
     project_id: UUID,
+    material_name: str | None = None,
     limit: int = Query(DEFAULT_REPORTING_PAGE_LIMIT, ge=1, le=MAX_REPORTING_PAGE_LIMIT),
     offset: int = Query(0, ge=0),
     auth: AuthContext = Depends(get_auth_context),
@@ -342,13 +367,16 @@ def list_material_stock_balances(
         auth,
         "materials",
     )
+    query = (
+        select(MaterialStockBalance)
+        .where(MaterialStockBalance.company_id == company_id)
+        .where(MaterialStockBalance.project_id == project_id)
+    )
+    query = _apply_text_filter(query, MaterialStockBalance.material_name, material_name)
     return list(
         db.scalars(
             _apply_pagination(
-                select(MaterialStockBalance)
-                .where(MaterialStockBalance.company_id == company_id)
-                .where(MaterialStockBalance.project_id == project_id)
-                .order_by(MaterialStockBalance.material_name),
+                query.order_by(MaterialStockBalance.material_name),
                 limit,
                 offset,
             )
@@ -360,6 +388,7 @@ def list_material_stock_balances(
 def count_material_stock_balances(
     company_id: UUID,
     project_id: UUID,
+    material_name: str | None = None,
     auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_database_session),
 ) -> ReportingCountRead:
@@ -376,6 +405,7 @@ def count_material_stock_balances(
         .where(MaterialStockBalance.company_id == company_id)
         .where(MaterialStockBalance.project_id == project_id)
     )
+    query = _apply_text_filter(query, MaterialStockBalance.material_name, material_name)
     return ReportingCountRead(total=db.scalar(query) or 0)
 
 
@@ -403,6 +433,8 @@ def list_media_files(
     project_id: UUID,
     from_date: date | None = None,
     to_date: date | None = None,
+    uploaded_by: UUID | None = None,
+    media_type: str | None = None,
     limit: int = Query(DEFAULT_REPORTING_PAGE_LIMIT, ge=1, le=MAX_REPORTING_PAGE_LIMIT),
     offset: int = Query(0, ge=0),
     auth: AuthContext = Depends(get_auth_context),
@@ -416,6 +448,8 @@ def list_media_files(
         .where(MediaFile.project_id == project_id)
     )
     query = _apply_datetime_date_range(query, MediaFile.created_at, from_date, to_date)
+    query = _apply_uuid_filter(query, MediaFile.uploaded_by, uploaded_by)
+    query = _apply_text_filter(query, MediaFile.media_type, media_type)
     return list(
         db.scalars(
             _apply_pagination(query.order_by(MediaFile.created_at.desc()), limit, offset)
@@ -429,6 +463,8 @@ def count_media_files(
     project_id: UUID,
     from_date: date | None = None,
     to_date: date | None = None,
+    uploaded_by: UUID | None = None,
+    media_type: str | None = None,
     auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_database_session),
 ) -> ReportingCountRead:
@@ -441,6 +477,8 @@ def count_media_files(
         .where(MediaFile.project_id == project_id)
     )
     query = _apply_datetime_date_range(query, MediaFile.created_at, from_date, to_date)
+    query = _apply_uuid_filter(query, MediaFile.uploaded_by, uploaded_by)
+    query = _apply_text_filter(query, MediaFile.media_type, media_type)
     return ReportingCountRead(total=db.scalar(query) or 0)
 
 
@@ -518,6 +556,19 @@ def _apply_datetime_date_range(query, field, from_date: date | None, to_date: da
         query = query.where(field >= datetime.combine(from_date, time.min))
     if to_date:
         query = query.where(field < datetime.combine(to_date + timedelta(days=1), time.min))
+    return query
+
+
+def _apply_uuid_filter(query, field, value: UUID | None):
+    if value:
+        query = query.where(field == value)
+    return query
+
+
+def _apply_text_filter(query, field, value: str | None):
+    candidate = (value or "").strip()
+    if candidate:
+        query = query.where(field.ilike(f"%{candidate}%"))
     return query
 
 

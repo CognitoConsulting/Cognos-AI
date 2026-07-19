@@ -724,6 +724,8 @@ Acceptance criteria:
 - dashboard users can move through reporting pages with Previous/Next controls per reporting section
 - reporting APIs expose total-count endpoints so the dashboard can show exact page ranges and disable Next at the real end
 - filters support user, activity, and material where relevant
+- dashboard includes extra filters for user, progress activity, manpower trade, material, and proof type
+- backend list and count endpoints apply the same extra filters so row counts stay accurate
 
 Dependencies:
 
