@@ -212,6 +212,7 @@ type LoginResponse = {
 
 type ProgressEntry = {
   id: string;
+  entered_by: string | null;
   activity_name: string;
   location_text: string | null;
   quantity: string;
@@ -222,6 +223,7 @@ type ProgressEntry = {
 
 type ManpowerEntry = {
   id: string;
+  entered_by: string | null;
   trade_name: string;
   worker_count: number;
   location_text: string | null;
@@ -231,6 +233,7 @@ type ManpowerEntry = {
 
 type MaterialTransaction = {
   id: string;
+  entered_by: string | null;
   transaction_type: "received" | "issued";
   material_name: string;
   quantity: string;
@@ -252,6 +255,7 @@ type MaterialStockBalance = {
 
 type MediaFile = {
   id: string;
+  uploaded_by: string | null;
   linked_entity_type: string | null;
   linked_entity_id: string | null;
   media_type: string;
@@ -286,9 +290,19 @@ type ReportingPagination = Record<ReportingSectionId, number>;
 
 type ReportingTotals = Record<ReportingSectionId, number>;
 
+type ReportingFilters = {
+  userId: string;
+  activityName: string;
+  tradeName: string;
+  materialName: string;
+  mediaType: string;
+};
+
 type ReportingCount = {
   total: number;
 };
+
+type ReportingQueryFilters = Record<string, string | undefined>;
 
 type AnalyticsRow = {
   label: string;
@@ -376,6 +390,14 @@ const emptyReportingPagination: ReportingPagination = {
   media: 0,
 };
 
+const emptyReportingFilters: ReportingFilters = {
+  userId: "",
+  activityName: "",
+  tradeName: "",
+  materialName: "",
+  mediaType: "",
+};
+
 const emptyNewUserForm = {
   name: "",
   phone: "",
@@ -441,6 +463,8 @@ export function App() {
   const [reportingData, setReportingData] = useState<ReportingData>(emptyReportingData);
   const [reportingPagination, setReportingPagination] =
     useState<ReportingPagination>(emptyReportingPagination);
+  const [reportingFilters, setReportingFilters] =
+    useState<ReportingFilters>(emptyReportingFilters);
   const [companyUsers, setCompanyUsers] = useState<CompanyUser[]>([]);
   const [projectAssignments, setProjectAssignments] = useState<ProjectAssignment[]>([]);
   const [knowledgeUploads, setKnowledgeUploads] = useState<ProjectKnowledgeUpload[]>([]);
@@ -548,6 +572,7 @@ export function App() {
       fromDate,
       toDate,
       reportingPagination,
+      reportingFilters,
     )
       .then((data) => {
         setReportingData(data);
@@ -558,7 +583,15 @@ export function App() {
         setLoadingMessage("");
         setErrorMessage(error.message);
       });
-  }, [selectedCompanyId, selectedProjectId, accessToken, fromDate, toDate, reportingPagination]);
+  }, [
+    selectedCompanyId,
+    selectedProjectId,
+    accessToken,
+    fromDate,
+    toDate,
+    reportingPagination,
+    reportingFilters,
+  ]);
 
   useEffect(() => {
     if (!selectedCompanyId || !currentUser || !isCompanyAdmin(currentUser.role)) {
@@ -721,6 +754,10 @@ export function App() {
     () => buildVisibleModules(currentUser, reportingData),
     [currentUser, reportingData],
   );
+  const reportingUserOptions = useMemo(
+    () => buildReportingUserOptions(companyUsers, currentUser),
+    [companyUsers, currentUser],
+  );
 
   function handleLogout() {
     localStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY);
@@ -730,6 +767,16 @@ export function App() {
 
   function resetReportingPagination() {
     setReportingPagination(emptyReportingPagination);
+  }
+
+  function handleReportingFilterChange(nextFilters: Partial<ReportingFilters>) {
+    resetReportingPagination();
+    setReportingFilters((currentFilters) => ({ ...currentFilters, ...nextFilters }));
+  }
+
+  function handleClearReportingFilters() {
+    resetReportingPagination();
+    setReportingFilters(emptyReportingFilters);
   }
 
   function handleReportingPageChange(sectionId: ReportingSectionId, direction: "previous" | "next") {
@@ -1424,6 +1471,13 @@ export function App() {
           </div>
         </section>
 
+        <ReportingFiltersPanel
+          filters={reportingFilters}
+          userOptions={reportingUserOptions}
+          onFilterChange={handleReportingFilterChange}
+          onClear={handleClearReportingFilters}
+        />
+
         <section className="card-grid" aria-label="Summary cards">
           {summaryCards.map((card) => (
             <article className={`summary-card ${card.tone}`} key={card.label}>
@@ -1478,6 +1532,10 @@ export function App() {
               <div>
                 <dt>Date range</dt>
                 <dd>{formatDateRange(fromDate, toDate)}</dd>
+              </div>
+              <div>
+                <dt>Extra filters</dt>
+                <dd>{formatReportingFilters(reportingFilters, reportingUserOptions)}</dd>
               </div>
             </dl>
           </article>
@@ -1655,6 +1713,102 @@ export function App() {
         </section>
       </section>
     </main>
+  );
+}
+
+function ReportingFiltersPanel({
+  filters,
+  userOptions,
+  onFilterChange,
+  onClear,
+}: {
+  filters: ReportingFilters;
+  userOptions: { id: string; label: string }[];
+  onFilterChange: (nextFilters: Partial<ReportingFilters>) => void;
+  onClear: () => void;
+}) {
+  const hasFilters = hasActiveReportingFilters(filters);
+
+  return (
+    <section className="panel reporting-filter-panel" aria-label="Reporting filters">
+      <div>
+        <p className="eyebrow">Filters</p>
+        <h3>Find specific site records</h3>
+        <p>
+          Narrow the dashboard by person, activity, trade, material, or proof type. These filters
+          are sent to the backend, so totals and pagination match the selected view.
+        </p>
+      </div>
+
+      <form className="stacked-form" onSubmit={(event) => event.preventDefault()}>
+        <div className="reporting-filter-grid">
+          <label>
+            Entered / uploaded by
+            <select
+              value={filters.userId}
+              onChange={(event) => onFilterChange({ userId: event.target.value })}
+            >
+              <option value="">All users</option>
+              {userOptions.map((user) => (
+                <option value={user.id} key={user.id}>
+                  {user.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label>
+            Progress activity
+            <input
+              type="search"
+              value={filters.activityName}
+              placeholder="Example: slab, plaster, excavation"
+              onChange={(event) => onFilterChange({ activityName: event.target.value })}
+            />
+          </label>
+
+          <label>
+            Manpower trade
+            <input
+              type="search"
+              value={filters.tradeName}
+              placeholder="Example: mason, helper, electrician"
+              onChange={(event) => onFilterChange({ tradeName: event.target.value })}
+            />
+          </label>
+
+          <label>
+            Material
+            <input
+              type="search"
+              value={filters.materialName}
+              placeholder="Example: cement, steel, sand"
+              onChange={(event) => onFilterChange({ materialName: event.target.value })}
+            />
+          </label>
+
+          <label>
+            Proof type
+            <select
+              value={filters.mediaType}
+              onChange={(event) => onFilterChange({ mediaType: event.target.value })}
+            >
+              <option value="">All proof types</option>
+              <option value="image">Images</option>
+              <option value="video">Videos</option>
+              <option value="audio">Audio</option>
+              <option value="document">Documents</option>
+            </select>
+          </label>
+        </div>
+
+        <div className="button-row">
+          <button type="button" className="secondary" disabled={!hasFilters} onClick={onClear}>
+            Clear extra filters
+          </button>
+        </div>
+      </form>
+    </section>
   );
 }
 
@@ -3421,14 +3575,54 @@ async function loadReportingData(
   fromDate = "",
   toDate = "",
   pagination: ReportingPagination = emptyReportingPagination,
+  filters: ReportingFilters = emptyReportingFilters,
 ): Promise<ReportingData> {
   const basePath = `/api/companies/${companyId}/projects/${projectId}/reporting`;
-  const progressQuery = reportingListQuery(fromDate, toDate, pagination.progress);
-  const manpowerQuery = reportingListQuery(fromDate, toDate, pagination.manpower);
-  const materialQuery = reportingListQuery(fromDate, toDate, pagination.materials);
-  const stockQuery = reportingListQuery("", "", pagination.stock);
-  const mediaQuery = reportingListQuery(fromDate, toDate, pagination.media);
-  const dateRangeCountQuery = reportingCountQuery(fromDate, toDate);
+  const userFilter = filters.userId || undefined;
+  const progressFilters = {
+    entered_by: userFilter,
+    activity_name: filters.activityName || undefined,
+  };
+  const manpowerFilters = {
+    entered_by: userFilter,
+    trade_name: filters.tradeName || undefined,
+  };
+  const materialFilters = {
+    entered_by: userFilter,
+    material_name: filters.materialName || undefined,
+  };
+  const stockFilters = {
+    material_name: filters.materialName || undefined,
+  };
+  const mediaFilters = {
+    uploaded_by: userFilter,
+    media_type: filters.mediaType || undefined,
+  };
+  const progressQuery = reportingListQuery(
+    fromDate,
+    toDate,
+    pagination.progress,
+    progressFilters,
+  );
+  const manpowerQuery = reportingListQuery(
+    fromDate,
+    toDate,
+    pagination.manpower,
+    manpowerFilters,
+  );
+  const materialQuery = reportingListQuery(
+    fromDate,
+    toDate,
+    pagination.materials,
+    materialFilters,
+  );
+  const stockQuery = reportingListQuery("", "", pagination.stock, stockFilters);
+  const mediaQuery = reportingListQuery(fromDate, toDate, pagination.media, mediaFilters);
+  const progressCountQuery = reportingCountQuery(fromDate, toDate, progressFilters);
+  const manpowerCountQuery = reportingCountQuery(fromDate, toDate, manpowerFilters);
+  const materialCountQuery = reportingCountQuery(fromDate, toDate, materialFilters);
+  const stockCountQuery = reportingCountQuery("", "", stockFilters);
+  const mediaCountQuery = reportingCountQuery(fromDate, toDate, mediaFilters);
   const [
     progress,
     manpower,
@@ -3467,27 +3661,27 @@ async function loadReportingData(
       [],
     ),
     optionalApiRequest<ReportingCount>(
-      `${basePath}/progress-entries/count${dateRangeCountQuery}`,
+      `${basePath}/progress-entries/count${progressCountQuery}`,
       accessToken,
       { total: 0 },
     ),
     optionalApiRequest<ReportingCount>(
-      `${basePath}/manpower-entries/count${dateRangeCountQuery}`,
+      `${basePath}/manpower-entries/count${manpowerCountQuery}`,
       accessToken,
       { total: 0 },
     ),
     optionalApiRequest<ReportingCount>(
-      `${basePath}/material-transactions/count${dateRangeCountQuery}`,
+      `${basePath}/material-transactions/count${materialCountQuery}`,
       accessToken,
       { total: 0 },
     ),
     optionalApiRequest<ReportingCount>(
-      `${basePath}/material-stock-balances/count`,
+      `${basePath}/material-stock-balances/count${stockCountQuery}`,
       accessToken,
       { total: 0 },
     ),
     optionalApiRequest<ReportingCount>(
-      `${basePath}/media-files/count${dateRangeCountQuery}`,
+      `${basePath}/media-files/count${mediaCountQuery}`,
       accessToken,
       { total: 0 },
     ),
@@ -3516,7 +3710,12 @@ async function loadReportingData(
   };
 }
 
-function reportingListQuery(fromDate = "", toDate = "", offset = 0): string {
+function reportingListQuery(
+  fromDate = "",
+  toDate = "",
+  offset = 0,
+  filters: ReportingQueryFilters = {},
+): string {
   const params = new URLSearchParams();
   if (fromDate) {
     params.set("from_date", fromDate);
@@ -3528,11 +3727,16 @@ function reportingListQuery(fromDate = "", toDate = "", offset = 0): string {
   if (offset > 0) {
     params.set("offset", String(offset));
   }
+  appendReportingQueryFilters(params, filters);
   const query = params.toString();
   return query ? `?${query}` : "";
 }
 
-function reportingCountQuery(fromDate = "", toDate = ""): string {
+function reportingCountQuery(
+  fromDate = "",
+  toDate = "",
+  filters: ReportingQueryFilters = {},
+): string {
   const params = new URLSearchParams();
   if (fromDate) {
     params.set("from_date", fromDate);
@@ -3540,8 +3744,21 @@ function reportingCountQuery(fromDate = "", toDate = ""): string {
   if (toDate) {
     params.set("to_date", toDate);
   }
+  appendReportingQueryFilters(params, filters);
   const query = params.toString();
   return query ? `?${query}` : "";
+}
+
+function appendReportingQueryFilters(
+  params: URLSearchParams,
+  filters: ReportingQueryFilters,
+) {
+  Object.entries(filters).forEach(([key, value]) => {
+    const cleanedValue = value?.trim();
+    if (cleanedValue) {
+      params.set(key, cleanedValue);
+    }
+  });
 }
 
 async function optionalApiRequest<T>(
@@ -4355,6 +4572,55 @@ function formatDateRange(fromDate: string, toDate: string): string {
     return `${fromDate} to ${toDate}`;
   }
   return fromDate ? `From ${fromDate}` : `Until ${toDate}`;
+}
+
+function buildReportingUserOptions(
+  companyUsers: CompanyUser[],
+  currentUser: AuthenticatedUser | null,
+): { id: string; label: string }[] {
+  const options = new Map<string, string>();
+
+  companyUsers.forEach((user) => {
+    options.set(user.id, `${user.name} (${formatRole(user.role)})`);
+  });
+
+  if (currentUser && !options.has(currentUser.id)) {
+    options.set(currentUser.id, `${currentUser.name} (${formatRole(currentUser.role)})`);
+  }
+
+  return Array.from(options, ([id, label]) => ({ id, label })).sort((first, second) =>
+    first.label.localeCompare(second.label),
+  );
+}
+
+function hasActiveReportingFilters(filters: ReportingFilters): boolean {
+  return Object.values(filters).some((value) => value.trim().length > 0);
+}
+
+function formatReportingFilters(
+  filters: ReportingFilters,
+  userOptions: { id: string; label: string }[],
+): string {
+  const activeFilters: string[] = [];
+  const selectedUser = userOptions.find((user) => user.id === filters.userId);
+
+  if (selectedUser) {
+    activeFilters.push(`User: ${selectedUser.label}`);
+  }
+  if (filters.activityName.trim()) {
+    activeFilters.push(`Activity: ${filters.activityName.trim()}`);
+  }
+  if (filters.tradeName.trim()) {
+    activeFilters.push(`Trade: ${filters.tradeName.trim()}`);
+  }
+  if (filters.materialName.trim()) {
+    activeFilters.push(`Material: ${filters.materialName.trim()}`);
+  }
+  if (filters.mediaType.trim()) {
+    activeFilters.push(`Proof type: ${filters.mediaType.trim()}`);
+  }
+
+  return activeFilters.length > 0 ? activeFilters.join("; ") : "None";
 }
 
 function formatDateTime(value: string): string {

@@ -21,6 +21,7 @@ Current live dashboard foundation:
 - loads companies and projects from the backend
 - shows saved progress, manpower, material, stock, and media/proof records
 - supports date range filtering
+- supports extra reporting filters for user, activity, trade, material, and proof type
 - includes summary cards
 - includes project-manager analytics cards for progress by area, manpower distribution, stock highlights, and attention items
 - includes Excel workbook export with separate sheets for accessible reporting sections
@@ -62,7 +63,7 @@ Current AI configuration limitations:
 
 Current export behavior:
 
-- the dashboard exports one `.xlsx` workbook for the selected company, project, and date range
+- the dashboard exports one `.xlsx` workbook for the selected company, project, date range, and active reporting filters
 - workbook sheets are included only for sections the signed-in user can access
 - workbook generation currently happens in the browser
 

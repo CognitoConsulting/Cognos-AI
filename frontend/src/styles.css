@@ -301,6 +301,17 @@ a {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.reporting-filter-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.reporting-filter-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
 .paginated-report-section {
   display: grid;
   gap: 10px;
@@ -567,6 +578,20 @@ button:hover {
 button:disabled {
   background: #98a2b3;
   cursor: not-allowed;
+}
+
+button.secondary {
+  background: #eef4ff;
+  color: #155eef;
+}
+
+button.secondary:hover {
+  background: #d1e0ff;
+}
+
+button.secondary:disabled {
+  background: #f2f4f7;
+  color: #98a2b3;
 }
 
 .table-panel {
@@ -836,6 +861,10 @@ td {
 
   .card-grid,
   .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .reporting-filter-grid {
     grid-template-columns: 1fr;
   }
 }

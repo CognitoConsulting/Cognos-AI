@@ -96,6 +96,7 @@ Current foundation includes:
 - dashboard notice explaining the current reporting page size
 - dashboard Previous/Next controls for paging through reporting sections
 - reporting total-count endpoints and exact dashboard pagination totals
+- reporting filters for user, progress activity, manpower trade, material, and proof type
 
 ## Planned architecture
 
